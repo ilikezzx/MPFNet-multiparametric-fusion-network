@@ -97,7 +97,7 @@ class MP_TBNet(ModuleClass):
             merges.append(x1 + x2)
 
         merge = x1 + x2
-        print(merge.shape)
+        # print(merge.shape)
         for i in range(self.num_level - 1):
             merge = self.ups[i](merge)
             merge = torch.cat((merge, merges[self.num_level - i - 2]), dim=1)
@@ -107,7 +107,7 @@ class MP_TBNet(ModuleClass):
         t1_pred = self.final_t1(merge[:, :dim // 2, :, :])
         t2_pred = self.final_t2(merge[:, dim // 2:, :, :])
 
-        print(t1_pred.shape, t2_pred.shape)
+        # print(t1_pred.shape, t2_pred.shape)
         return t1_pred, t2_pred
 
 
