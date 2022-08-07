@@ -1,3 +1,4 @@
+import warnings
 import argparse
 import logging
 import sys
@@ -21,8 +22,9 @@ from evaluate import evaluate
 from models import MP_TBNet
 
 ori_img = r'C:\osteosarcoma\2D-dataset'
-dir_checkpoint = Path('./MP-TBNet/')
+dir_checkpoint = Path('./checkpoints/MP-TBNet/')
 writer = SummaryWriter('./log')
+warnings.filterwarnings("ignore")
 
 
 def train_net(net,
@@ -81,58 +83,58 @@ def train_net(net,
         epoch_loss = 0
         tot_loss = 0.0
         with tqdm(total=n_train, desc=f'Epoch {epoch + 1}/{epochs}', unit='img') as pbar:
-            for index, batch in enumerate(train_loader):
-                # images = batch['image']
-                # true_masks = batch['mask']
-
-                t1_image = batch['t1_image']
-                t1_tg = batch['t1_mask']
-                t2_image = batch['t2_image']
-                t2_tg = batch['t2_mask']
-
-                assert t1_image.shape[1] == 1, \
-                    f'Network has been defined with {1} input channels, ' \
-                    f'but loaded images have {t1_image.shape[1]} channels. Please check that ' \
-                    'the images are loaded correctly.'
-
-                assert t2_image.shape[1] == 1, \
-                    f'Network has been defined with {1} input channels, ' \
-                    f'but loaded images have {t2_image.shape[1]} channels. Please check that ' \
-                    'the images are loaded correctly.'
-
-                t1_image = t1_image.to(device=device, dtype=torch.float32)
-                t1_tg = t1_tg.to(device=device, dtype=torch.long)
-                t2_image = t2_image.to(device=device, dtype=torch.float32)
-                t2_tg = t2_tg.to(device=device, dtype=torch.long)
-
-                with torch.cuda.amp.autocast(enabled=amp):
-                    t1_pred, t2_pred = net(t1_image, t2_image)
-                    loss_t1 = 0.25 * criterion(t1_pred, t1_tg) + 0.75 * dice_loss(F.softmax(t1_pred, dim=1).float(),
-                                                                                  F.one_hot(t1_tg,
-                                                                                            net.n_classes).permute(0, 3,
-                                                                                                                   1,
-                                                                                                                   2).float(),
-                                                                                  multiclass=True)
-                    loss_t2 = 0.25 * criterion(t2_pred, t2_tg) + 0.75 * dice_loss(F.softmax(t2_pred, dim=1).float(),
-                                                                                  F.one_hot(t2_tg,
-                                                                                            net.n_classes).permute(0, 3,
-                                                                                                                   1,
-                                                                                                                   2).float(),
-                                                                                  multiclass=True)
-
-                    tot_loss += loss_t1.item() + loss_t2.item()
-
-                optimizer.zero_grad(set_to_none=True)
-                grad_scaler.scale(loss_t1 + loss_t2).backward()
-                grad_scaler.step(optimizer)
-                grad_scaler.update()
-                lr_scheduler.step()  # 更新学习率
-
-                pbar.update(t1_image.shape[0])
-                global_step += 1
-                pbar.set_postfix(**{'avg loss': tot_loss / (index + 1)})
-                writer.add_scalar('train_loss', tot_loss / (index + 1), epoch)
-                torch.cuda.empty_cache()
+            # for index, batch in enumerate(train_loader):
+            #     # images = batch['image']
+            #     # true_masks = batch['mask']
+            #
+            #     t1_image = batch['t1_image']
+            #     t1_tg = batch['t1_mask']
+            #     t2_image = batch['t2_image']
+            #     t2_tg = batch['t2_mask']
+            #
+            #     assert t1_image.shape[1] == 1, \
+            #         f'Network has been defined with {1} input channels, ' \
+            #         f'but loaded images have {t1_image.shape[1]} channels. Please check that ' \
+            #         'the images are loaded correctly.'
+            #
+            #     assert t2_image.shape[1] == 1, \
+            #         f'Network has been defined with {1} input channels, ' \
+            #         f'but loaded images have {t2_image.shape[1]} channels. Please check that ' \
+            #         'the images are loaded correctly.'
+            #
+            #     t1_image = t1_image.to(device=device, dtype=torch.float32)
+            #     t1_tg = t1_tg.to(device=device, dtype=torch.long)
+            #     t2_image = t2_image.to(device=device, dtype=torch.float32)
+            #     t2_tg = t2_tg.to(device=device, dtype=torch.long)
+            #
+            #     with torch.cuda.amp.autocast(enabled=amp):
+            #         t1_pred, t2_pred = net(t1_image, t2_image)
+            #         loss_t1 = 0.25 * criterion(t1_pred, t1_tg) + 0.75 * dice_loss(F.softmax(t1_pred, dim=1).float(),
+            #                                                                       F.one_hot(t1_tg,
+            #                                                                                 net.n_classes).permute(0, 3,
+            #                                                                                                        1,
+            #                                                                                                        2).float(),
+            #                                                                       multiclass=True)
+            #         loss_t2 = 0.25 * criterion(t2_pred, t2_tg) + 0.75 * dice_loss(F.softmax(t2_pred, dim=1).float(),
+            #                                                                       F.one_hot(t2_tg,
+            #                                                                                 net.n_classes).permute(0, 3,
+            #                                                                                                        1,
+            #                                                                                                        2).float(),
+            #                                                                       multiclass=True)
+            #
+            #         tot_loss += loss_t1.item() + loss_t2.item()
+            #
+            #     optimizer.zero_grad(set_to_none=True)
+            #     grad_scaler.scale(loss_t1 + loss_t2).backward()
+            #     grad_scaler.step(optimizer)
+            #     grad_scaler.update()
+            #     lr_scheduler.step()  # 更新学习率
+            #
+            #     pbar.update(t1_image.shape[0])
+            #     global_step += 1
+            #     pbar.set_postfix(**{'avg loss': tot_loss / (index + 1)})
+            #     writer.add_scalar('train_loss', tot_loss / (index + 1), epoch)
+            #     torch.cuda.empty_cache()
 
             val_score, (other_val_metrics_t1, other_val_metrics_t2) = evaluate(net, val_loader, device, logging)
 
