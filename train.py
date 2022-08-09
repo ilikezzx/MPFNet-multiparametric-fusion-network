@@ -19,10 +19,10 @@ from torch.utils.tensorboard import SummaryWriter
 from utils.dice_score import dice_loss
 
 from evaluate import evaluate
-from models import MP_TBNet
+from models import MP_TBNet, MP_TBNet_ADD
 
-ori_img = r'C:\osteosarcoma\2D-dataset'
-dir_checkpoint = Path('./checkpoints/MP-TBNet/')
+ori_img = r'C:\Users\12828\Desktop\osteosarcoma\bone-segmentation\2D-dataset'
+dir_checkpoint = Path('./checkpoints/MP-TBNet-ADD/')
 writer = SummaryWriter('./log')
 warnings.filterwarnings("ignore")
 
@@ -204,8 +204,8 @@ if __name__ == '__main__':
     # Change here to adapt to your data
     # n_channels=3 for RGB images
     # n_classes is the number of probabilities you want to get per pixel
-    net = MP_TBNet(1, 3)
-
+    # net = MP_TBNet(1, 3)
+    net = MP_TBNet_ADD(1, 3)
     # macs, params = get_model_complexity_info(net, (1, 224, 224)*2, as_strings=True,
     #                                          print_per_layer_stat=True, verbose=True)
     # print('{:<30} {:<8}'.format('Computational complexity: ', macs))

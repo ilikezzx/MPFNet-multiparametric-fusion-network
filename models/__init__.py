@@ -7,6 +7,7 @@
 """
 
 from .tbNet import MP_TBNet
+from .tbNet_Add import MP_TBNet_ADD
 
 
-__all__ = ['MP_TBNet']
+__all__ = ['MP_TBNet', 'MP_TBNet_ADD']
