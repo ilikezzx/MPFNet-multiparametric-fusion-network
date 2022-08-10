@@ -77,8 +77,8 @@ class MP_TBNet(ModuleClass):
         # self.connections = nn.ModuleList(connections)
 
         # output
-        self.final_t1 = nn.Conv2d(self.f_maps[0] // 2, self.n_classes, kernel_size=1, stride=1, padding=0)
-        self.final_t2 = nn.Conv2d(self.f_maps[0] // 2, self.n_classes, kernel_size=1, stride=1, padding=0)
+        self.final_t1 = nn.Conv2d(self.f_maps[0] // 2, self.n_classes[0], kernel_size=1, stride=1, padding=0)
+        self.final_t2 = nn.Conv2d(self.f_maps[0] // 2, self.n_classes[1], kernel_size=1, stride=1, padding=0)
 
     def forward(self, x1, x2):
         """ x1: T1W image
@@ -113,7 +113,7 @@ class MP_TBNet(ModuleClass):
 
 if __name__ == '__main__':
     # print(number_of_features_per_level(64, 4))
-    model = MP_TBNet(1, 2)
+    model = MP_TBNet(1, (3, 2))
     print(model)
     x1 = torch.randn(2, 1, 224, 224)
     x2 = torch.randn(2, 1, 224, 224)

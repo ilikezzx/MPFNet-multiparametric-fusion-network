@@ -111,13 +111,13 @@ def train_net(net,
                     t1_pred, t2_pred = net(t1_image, t2_image)
                     loss_t1 = 0.25 * criterion(t1_pred, t1_tg) + 0.75 * dice_loss(F.softmax(t1_pred, dim=1).float(),
                                                                                   F.one_hot(t1_tg,
-                                                                                            net.n_classes).permute(0, 3,
+                                                                                            net.n_classes[0]).permute(0, 3,
                                                                                                                    1,
                                                                                                                    2).float(),
                                                                                   multiclass=True)
                     loss_t2 = 0.25 * criterion(t2_pred, t2_tg) + 0.75 * dice_loss(F.softmax(t2_pred, dim=1).float(),
                                                                                   F.one_hot(t2_tg,
-                                                                                            net.n_classes).permute(0, 3,
+                                                                                            net.n_classes[1]).permute(0, 3,
                                                                                                                    1,
                                                                                                                    2).float(),
                                                                                   multiclass=True)
@@ -183,7 +183,7 @@ def get_args():
     parser = argparse.ArgumentParser(description='Train the UNet on images and target masks')
     parser.add_argument('--epochs', '-e', metavar='E', type=int, default=50, help='Number of epochs')
     parser.add_argument('--batch-size', '-b', dest='batch_size', metavar='B', type=int, default=2, help='Batch size')
-    parser.add_argument('--learning-rate', '-l', metavar='LR', type=float, default=0.01,
+    parser.add_argument('--learning-rate', '-l', metavar='LR', type=float, default=0.001,
                         help='Learning rate', dest='lr')
     parser.add_argument('--load', '-f', type=str, default=None,
                         help='Load model from a .pth file')
@@ -205,7 +205,7 @@ if __name__ == '__main__':
     # n_channels=3 for RGB images
     # n_classes is the number of probabilities you want to get per pixel
     # net = MP_TBNet(1, 3)
-    net = MP_TBNet_ADD(1, 3)
+    net = MP_TBNet_ADD(1, (3, 2))
     # macs, params = get_model_complexity_info(net, (1, 224, 224)*2, as_strings=True,
     #                                          print_per_layer_stat=True, verbose=True)
     # print('{:<30} {:<8}'.format('Computational complexity: ', macs))
