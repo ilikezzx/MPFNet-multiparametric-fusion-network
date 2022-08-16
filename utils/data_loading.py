@@ -80,6 +80,7 @@ class MyDataset(Dataset):
         assert t2_image.size == t2_mask.size, \
             f'Image and mask {self.images_t2_path[idx]} should be the same size, but are {t2_image.size} and {t2_mask.size}'
 
+        t2_mask[t2_mask == 2] = 0
         # # 统一尺寸
         # if t1_image.size < t2_image.size:
         #     t2_image = cv2.resize(t2_image, (t1_image.shape[1], t1_image.shape[0]), interpolation=cv2.INTER_AREA)

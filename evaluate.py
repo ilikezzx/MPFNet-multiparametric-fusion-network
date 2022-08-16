@@ -62,8 +62,8 @@ def evaluate(net, dataloader, device, logging):
             for channel in range(len(batch_channel_dsc_t2)):
                 channel_dsc_t2[channel] += batch_channel_dsc_t2[channel]
 
-            other_val_metrics_t1.upd(t1_pred, t1_tg)
-            other_val_metrics_t2.upd(t2_pred, t2_tg)
+            # other_val_metrics_t1.upd(t1_pred, t1_tg)
+            # other_val_metrics_t2.upd(t2_pred, t2_tg)
 
     for channel in range(len(channel_dsc_t1)):
         logging.info(f'T1: {T1_area_name[channel]} category dsc:{channel_dsc_t1[channel] / num_val_batches}')
@@ -72,4 +72,5 @@ def evaluate(net, dataloader, device, logging):
         logging.info(f'T2: {T2_area_name[channel]} category dsc:{channel_dsc_t2[channel] / num_val_batches}')
 
     net.train()
-    return dice_score / num_val_batches, (other_val_metrics_t1.get(), other_val_metrics_t2.get())
+    # return dice_score / num_val_batches, (other_val_metrics_t1.get(), other_val_metrics_t2.get())
+    return dice_score / num_val_batches
