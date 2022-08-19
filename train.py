@@ -111,9 +111,7 @@ def train_net(net,
 
                 with torch.cuda.amp.autocast(enabled=amp):
                     if is_concat:
-                        print(t1_image.shape, t2_image.shape)
                         input_images = torch.cat([t1_image, t2_image], dim=1)
-                        print(input_images.shape)
                         t1_pred, t2_pred = net(input_images)
                     else:
                         t1_pred, t2_pred = net(t1_image, t2_image)
@@ -146,7 +144,8 @@ def train_net(net,
                 writer.add_scalar('train_loss', tot_loss / (index + 1), epoch)
                 torch.cuda.empty_cache()
 
-            val_score, (other_val_metrics_t1, other_val_metrics_t2) = evaluate(net, val_loader, device, logging)
+            # val_score, (other_val_metrics_t1, other_val_metrics_t2) = evaluate(net, val_loader, device, logging, is_concat=is_concat)
+            val_score = evaluate(net, val_loader, device, logging, is_concat=is_concat)
 
             # logging
             logging.info(f'Validation Dice score: {val_score}')
@@ -213,20 +212,23 @@ if __name__ == '__main__':
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     logging.info(f'Using device {device}')
 
+    input_channel = 1+1
+    out_channel = [3, 2]
+
     # Change here to adapt to your data
     # n_channels=3 for RGB images
     # n_classes is the number of probabilities you want to get per pixel
     # net = MP_TBNet(1, 3)
     # net = MP_TBNet_ADD(1, (3, 2))
-    net = AttU_Net(img_ch=1 + 1, output_ch=[3, 2])
+    net = AttU_Net(img_ch=input_channel, output_ch=out_channel)
     # macs, params = get_model_complexity_info(net, (1, 224, 224)*2, as_strings=True,
     #                                          print_per_layer_stat=True, verbose=True)
     # print('{:<30} {:<8}'.format('Computational complexity: ', macs))
     # print('{:<30} {:<8}'.format('Number of parameters: ', params))
     net.to(device=device)
     logging.info(f'Network:\n'
-                 f'\t{1+1} input channels\n'
-                 f'\t{[3, 2]} output channels (classes)\n')
+                 f'\t{input_channel} input channels\n'
+                 f'\t{out_channel} output channels (classes)\n')
 
     try:
         train_net(net=net,

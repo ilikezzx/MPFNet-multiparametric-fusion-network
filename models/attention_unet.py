@@ -11,6 +11,8 @@ import torch.nn.functional as F
 import torch.utils.data
 import torch
 
+from .models import ModuleClass
+
 
 class conv_block(nn.Module):
     """
@@ -87,7 +89,7 @@ class Attention_block(nn.Module):
         return out
 
 
-class AttU_Net(nn.Module):
+class AttU_Net(ModuleClass):
     """
     Attention Unet implementation
     Paper: https://arxiv.org/abs/1804.03999
