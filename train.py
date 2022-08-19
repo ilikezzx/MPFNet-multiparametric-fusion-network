@@ -19,10 +19,10 @@ from torch.utils.tensorboard import SummaryWriter
 from utils.dice_score import dice_loss
 
 from evaluate import evaluate
-from models import MP_TBNet, MP_TBNet_ADD
+from models import MP_TBNet, MP_TBNet_ADD, AttU_Net
 
-ori_img = r'C:\Users\12828\Desktop\osteosarcoma\bone-segmentation\2D-dataset'
-dir_checkpoint = Path('./checkpoints/MP-TBNet-ADD/')
+ori_img = r'.\2D-dataset'
+dir_checkpoint = Path('./checkpoints/test/')
 writer = SummaryWriter('./log')
 warnings.filterwarnings("ignore")
 
@@ -34,6 +34,7 @@ def train_net(net,
               learning_rate: float = 0.001,
               val_percent: float = 0.1,
               save_checkpoint: bool = True,
+              is_concat: bool = False,
               amp: bool = False):
     # 1. Create dataset
     dataset = MyDataset(ori_img)
@@ -56,6 +57,7 @@ def train_net(net,
         Validation size: {n_val}
         Checkpoints:     {save_checkpoint}
         Device:          {device.type}
+        is_concat:       {is_concat}
         Mixed Precision: {amp}
     ''')
 
@@ -108,18 +110,26 @@ def train_net(net,
                 t2_tg = t2_tg.to(device=device, dtype=torch.long)
 
                 with torch.cuda.amp.autocast(enabled=amp):
-                    t1_pred, t2_pred = net(t1_image, t2_image)
-                    loss_t1 = 0.25 * criterion(t1_pred, t1_tg) + 0.75 * dice_loss(F.softmax(t1_pred, dim=1).float(),
+                    if is_concat:
+                        print(t1_image.shape, t2_image.shape)
+                        input_images = torch.cat([t1_image, t2_image], dim=1)
+                        print(input_images.shape)
+                        t1_pred, t2_pred = net(input_images)
+                    else:
+                        t1_pred, t2_pred = net(t1_image, t2_image)
+                    loss_t1 = 0.5 * criterion(t1_pred, t1_tg) + 0.5 * dice_loss(F.softmax(t1_pred, dim=1).float(),
                                                                                   F.one_hot(t1_tg,
-                                                                                            net.n_classes[0]).permute(0, 3,
-                                                                                                                   1,
-                                                                                                                   2).float(),
+                                                                                            net.n_classes[0]).permute(0,
+                                                                                                                      3,
+                                                                                                                      1,
+                                                                                                                      2).float(),
                                                                                   multiclass=True)
-                    loss_t2 = 0.25 * criterion(t2_pred, t2_tg) + 0.75 * dice_loss(F.softmax(t2_pred, dim=1).float(),
+                    loss_t2 = 0.5 * criterion(t2_pred, t2_tg) + 0.5 * dice_loss(F.softmax(t2_pred, dim=1).float(),
                                                                                   F.one_hot(t2_tg,
-                                                                                            net.n_classes[1]).permute(0, 3,
-                                                                                                                   1,
-                                                                                                                   2).float(),
+                                                                                            net.n_classes[1]).permute(0,
+                                                                                                                      3,
+                                                                                                                      1,
+                                                                                                                      2).float(),
                                                                                   multiclass=True)
 
                     tot_loss += loss_t1.item() + loss_t2.item()
@@ -187,6 +197,8 @@ def get_args():
                         help='Learning rate', dest='lr')
     parser.add_argument('--load', '-f', type=str, default=None,
                         help='Load model from a .pth file')
+    parser.add_argument('--is-concat', action='store_true', default=True,
+                        help='concating input-images')
     parser.add_argument('--validation', '-v', dest='val', type=float, default=25.0,
                         help='Percent of the data that is used as validation (0-100)')
     parser.add_argument('--amp', action='store_true', default=False, help='Use mixed precision')
@@ -205,15 +217,16 @@ if __name__ == '__main__':
     # n_channels=3 for RGB images
     # n_classes is the number of probabilities you want to get per pixel
     # net = MP_TBNet(1, 3)
-    net = MP_TBNet_ADD(1, (3, 2))
+    # net = MP_TBNet_ADD(1, (3, 2))
+    net = AttU_Net(img_ch=1 + 1, output_ch=[3, 2])
     # macs, params = get_model_complexity_info(net, (1, 224, 224)*2, as_strings=True,
     #                                          print_per_layer_stat=True, verbose=True)
     # print('{:<30} {:<8}'.format('Computational complexity: ', macs))
     # print('{:<30} {:<8}'.format('Number of parameters: ', params))
     net.to(device=device)
     logging.info(f'Network:\n'
-                 f'\t{1} input channels\n'
-                 f'\t{3} output channels (classes)\n')
+                 f'\t{1+1} input channels\n'
+                 f'\t{[3, 2]} output channels (classes)\n')
 
     try:
         train_net(net=net,
@@ -222,6 +235,7 @@ if __name__ == '__main__':
                   learning_rate=args.lr,
                   device=device,
                   val_percent=args.val / 100,
+                  is_concat=args.is_concat,
                   amp=args.amp)
     except KeyboardInterrupt:
         # torch.save(net.state_dict(), 'INTERRUPTED.pth')

@@ -8,6 +8,7 @@
 
 from .tbNet import MP_TBNet
 from .tbNet_Add import MP_TBNet_ADD
+from .attention_unet import AttU_Net
 
 
-__all__ = ['MP_TBNet', 'MP_TBNet_ADD']
+__all__ = ['MP_TBNet', 'MP_TBNet_ADD', 'AttU_Net']

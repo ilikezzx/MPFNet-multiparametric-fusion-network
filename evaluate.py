@@ -9,7 +9,7 @@ T1_area_name = ['Tumor', 'bad']
 T2_area_name = ['Tumor', 'Water']
 
 
-def evaluate(net, dataloader, device, logging):
+def evaluate(net, dataloader, device, logging, is_concat=False):
     net.eval()
     num_val_batches = len(dataloader)
     dice_score = 0
@@ -36,7 +36,12 @@ def evaluate(net, dataloader, device, logging):
 
         with torch.no_grad():
             # predict the mask
-            t1_pred, t2_pred = net(t1_image, t2_image)
+            if is_concat:
+                input_images = torch.cat([t1_image, t2_image], dim=1)
+                t1_pred, t2_pred = net(input_images)
+            else:
+                t1_pred, t2_pred = net(t1_image, t2_image)
+            # t1_pred, t2_pred = net(t1_image, t2_image)
 
             mask_pred_oh_t1 = F.one_hot(t1_pred.argmax(dim=1), net.n_classes[0]).permute(0, 3, 1, 2).float()
             mask_true_oh_t1 = F.one_hot(t1_tg, net.n_classes[0]).permute(0, 3, 1, 2).float()
