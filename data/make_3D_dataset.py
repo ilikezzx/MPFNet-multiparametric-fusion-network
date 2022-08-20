@@ -17,6 +17,7 @@ Description:
 
 import os
 import cv2
+import math
 import shutil
 import numpy as np
 
@@ -24,7 +25,7 @@ origin_dataset = r'C:\Users\12828\Desktop\osteosarcoma\mergedata'
 new2D_dataset = r'C:\Users\12828\Desktop\osteosarcoma\3D-dataset'
 
 stride = 2
-patch_depth = 5
+patch_depth = 4
 
 if __name__ == '__main__':
     for patient_name in os.listdir(origin_dataset):
@@ -81,7 +82,7 @@ if __name__ == '__main__':
                     if len(np.unique(t2_mask)) > 1:
                         have_mask_t2 += 1
 
-                if have_mask_t1 <= round(patch_depth / 2) or have_mask_t2 <= round(patch_depth / 2):
+                if have_mask_t1 <= math.ceil(patch_depth / 2)-1 or have_mask_t2 <= math.ceil(patch_depth / 2)-1:
                     continue
 
                 store_path = os.path.join(new2D_dataset, patient_name, str(cnt).zfill(3))
