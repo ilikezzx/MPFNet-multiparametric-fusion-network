@@ -22,10 +22,12 @@ from utils.dice_score import dice_loss
 from evaluate import evaluate
 from models import MP_TBNet, MP_TBNet_ADD, AttU_Net, U_Net_3D
 
-ori_img = r'C:\Users\12828\Desktop\osteosarcoma\3D-dataset'
-dir_checkpoint = Path('./checkpoints/test/')
+ori_img = r'./3D-dataset'
+dir_checkpoint = Path('./checkpoints/ResUNet-3D-2/')
 writer = SummaryWriter('./log')
 warnings.filterwarnings("ignore")
+
+goal_batch_size = 32
 
 
 def train_net(net,
@@ -53,6 +55,7 @@ def train_net(net,
     loader_args = dict(batch_size=batch_size, num_workers=0, pin_memory=True)
     train_loader = DataLoader(train_set, shuffle=True, **loader_args)
     val_loader = DataLoader(val_set, shuffle=False, **loader_args)
+    accumulation_step = goal_batch_size // batch_size
 
     logging.info(f'''Starting training:
         Epochs:          {epochs}
@@ -64,6 +67,7 @@ def train_net(net,
         Device:          {device.type}
         is_concat:       {is_concat}
         Mixed Precision: {amp}
+        accumulation_step: {accumulation_step}
     ''')
 
     # 4. Set up the optimizer, the loss, the learning rate scheduler and the loss scaling for AMP
@@ -127,6 +131,7 @@ def train_net(net,
                                                                                                                     1,
                                                                                                                     2).float(),
                                                                                 multiclass=True)
+
                     loss_t2 = 0.5 * criterion(t2_pred, t2_tg) + 0.5 * dice_loss(F.softmax(t2_pred, dim=1).float(),
                                                                                 F.one_hot(t2_tg,
                                                                                           net.n_classes[1]).permute(0,
@@ -134,21 +139,22 @@ def train_net(net,
                                                                                                                     1,
                                                                                                                     2).float(),
                                                                                 multiclass=True)
-
-                    tot_loss += loss_t1.item() + loss_t2.item()
+                    tot_loss += loss_t2.item() + loss_t1.item()
 
                 optimizer.zero_grad(set_to_none=True)
                 grad_scaler.scale(loss_t1 + loss_t2).backward()
-                grad_scaler.step(optimizer)
-                grad_scaler.update()
-                lr_scheduler.step()  # 更新学习率
+
+                if (index+1) % accumulation_step == 0 or (index+1) == len(train_loader):
+                    grad_scaler.step(optimizer)
+                    grad_scaler.update()
+                    lr_scheduler.step()  # 更新学习率
 
                 pbar.update(t1_image.shape[0])
                 global_step += 1
                 pbar.set_postfix(**{'avg loss': tot_loss / (index + 1)})
-                writer.add_scalar('train_loss', tot_loss / (index + 1), epoch)
-                torch.cuda.empty_cache()
 
+            writer.add_scalar('train_loss', tot_loss / len(train_loader), epoch)
+            torch.cuda.empty_cache()
             # val_score, (other_val_metrics_t1, other_val_metrics_t2) = evaluate(net, val_loader, device, logging, is_concat=is_concat)
             val_score = evaluate(net, val_loader, device, logging, is_concat=is_concat)
 
@@ -182,20 +188,10 @@ def train_net(net,
         Path(dir_checkpoint).mkdir(parents=True, exist_ok=True)
         net.save_checkpoint(stat, is_best, dir_checkpoint, logging)
 
-        # if save_checkpoint:
-        #     Path(dir_checkpoint).mkdir(parents=True, exist_ok=True)
-        #     torch.save(net.state_dict(), str(dir_checkpoint / 'checkpoint_epoch{}.pth'.format(epoch + 1)))
-        #     if best_score < val_score:
-        #         logging.info('*' * 10, 'best dsc update!'.format(val_score), '*' * 10)
-        #         best_score = val_score
-        #         torch.save(net.state_dict(), str(dir_checkpoint / 'best.pth'))
-        #
-        #     logging.info(f'Checkpoint {epoch + 1} saved!')
-
 
 def get_args():
     parser = argparse.ArgumentParser(description='Train the UNet on images and target masks')
-    parser.add_argument('--epochs', '-e', metavar='E', type=int, default=50, help='Number of epochs')
+    parser.add_argument('--epochs', '-e', metavar='E', type=int, default=300, help='Number of epochs')
     parser.add_argument('--batch-size', '-b', dest='batch_size', metavar='B', type=int, default=2, help='Batch size')
     parser.add_argument('--learning-rate', '-l', metavar='LR', type=float, default=0.001,
                         help='Learning rate', dest='lr')
@@ -205,7 +201,7 @@ def get_args():
     parser.add_argument('--is-3D', default=True, help='use 3D Dataset')
     parser.add_argument('--validation', '-v', dest='val', type=float, default=25.0,
                         help='Percent of the data that is used as validation (0-100)')
-    parser.add_argument('--amp', action='store_true', default=False, help='Use mixed precision')
+    parser.add_argument('--amp', action='store_true', default=True, help='Use mixed precision')
 
     return parser.parse_args()
 

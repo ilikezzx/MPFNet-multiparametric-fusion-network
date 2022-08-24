@@ -19,7 +19,8 @@ from tqdm import tqdm
 from draw_curve import curve
 
 # storeDatePath = r'C:\osteosarcoma\mergeData'
-storeDatePath = r'C:\osteosarcoma\2D-dataset'
+# storeDatePath = r'C:\osteosarcoma\2D-dataset'
+storeDatePath = r'C:\Users\12828\Desktop\osteosarcoma\3D-dataset'
 
 def find(arr, min, max):
     pos_min = arr > min
@@ -35,11 +36,11 @@ if __name__ == '__main__':
     # images_t2_path = glob.glob(storeDatePath + "/**/**/*t2*/images/**.png")
     # masks_t2_path = glob.glob(storeDatePath + "/**/**/*t2*/mask/**.png")
 
-    images_t1_path = glob.glob(storeDatePath + "/**/**/*t1.png")
-    masks_t1_path = glob.glob(storeDatePath + "/**/**/*t1_mask.png")
+    images_t1_path = glob.glob(storeDatePath + "/**/**/*t1_?.png")
+    masks_t1_path = glob.glob(storeDatePath + "/**/**/*t1_mask_?.png")
 
-    images_t2_path = glob.glob(storeDatePath + "/**/**/*t2.png")
-    masks_t2_path = glob.glob(storeDatePath + "/**/**/*t2_mask.png")
+    images_t2_path = glob.glob(storeDatePath + "/**/**/*t2_?.png")
+    masks_t2_path = glob.glob(storeDatePath + "/**/**/*t2_mask_?.png")
 
     # for d in images_path:
     #     os.rename(d, '\\'.join(d.split('\\')[:-1])+"\\"+d.split('\\')[-1].split('.')[0].zfill(2)+".png")

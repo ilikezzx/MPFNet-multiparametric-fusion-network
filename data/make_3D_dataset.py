@@ -24,7 +24,7 @@ import numpy as np
 origin_dataset = r'C:\Users\12828\Desktop\osteosarcoma\mergedata'
 new2D_dataset = r'C:\Users\12828\Desktop\osteosarcoma\3D-dataset'
 
-stride = 2
+stride = 1
 patch_depth = 4
 
 if __name__ == '__main__':
@@ -74,15 +74,17 @@ if __name__ == '__main__':
 
                 for _, t1_mask in t1s:
                     t1_mask = cv2.imread(t1_mask, cv2.IMREAD_GRAYSCALE)
+                    t1_mask[t1_mask != 0] = 1
                     if len(np.unique(t1_mask)) > 1:
                         have_mask_t1 += 1
 
                 for _, t2_mask in t2s:
                     t2_mask = cv2.imread(t2_mask, cv2.IMREAD_GRAYSCALE)
+                    t2_mask[t2_mask > 1] = 0
                     if len(np.unique(t2_mask)) > 1:
                         have_mask_t2 += 1
 
-                if have_mask_t1 <= math.ceil(patch_depth / 2)-1 or have_mask_t2 <= math.ceil(patch_depth / 2)-1:
+                if have_mask_t1 <= math.ceil(patch_depth / 2) or have_mask_t2 <= math.ceil(patch_depth / 2):
                     continue
 
                 store_path = os.path.join(new2D_dataset, patient_name, str(cnt).zfill(3))

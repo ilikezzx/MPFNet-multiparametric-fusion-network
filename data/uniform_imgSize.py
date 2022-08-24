@@ -14,7 +14,7 @@ import glob
 from tqdm import tqdm
 
 if __name__ == '__main__':
-    u_shape = (224, 224)
+    u_shape = (320, 320)
     ori_img = r'C:\Users\12828\Desktop\osteosarcoma\3D-dataset'
     images_path = glob.glob(ori_img + "/**/**/**.png")
 
