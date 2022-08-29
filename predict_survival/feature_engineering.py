@@ -21,8 +21,10 @@ import numpy as np
 import pandas as pd
 import SimpleITK as sitk
 
-
 from radiomics import featureextractor
+from load_dataset import loading_dataset
+from load_clinical import loading_clinical_data
+from features_selectiono import lasso_prediction
 
 
 def get_feature(img_path, roi_path, is_T1=True):
@@ -70,7 +72,7 @@ def get_feature(img_path, roi_path, is_T1=True):
     logger.setLevel(logging.ERROR)
     # Define settings for signature calculation
     # These are currently set equal to the respective default values
-    settings = {'binWidth': 25, 'resampledPixelSpacing': resampledPixelSpacing, 'interpolator': sitk.sitkBSpline}
+    settings = {'binWidth': 25, 'resampledPixelSpacing': [0, 0 ,0], 'interpolator': sitk.sitkBSpline}
     # [h,w,z] for defining resampling (voxels with size h x w x z mm)
     # Initialize feature extractor
     extractor = featureextractor.RadiomicsFeatureExtractor(**settings)
@@ -83,7 +85,9 @@ def get_feature(img_path, roi_path, is_T1=True):
     return featureVector
 
 
-def obtain_features(dataset_path, store_excel_path=r'./features.csv'):
+
+
+def obtain_features(dataset_path, patients_clinical, store_excel_path=r'./features.csv'):
     t1 = time.time()
     features_array = []
     for patient in os.listdir(dataset_path):
@@ -91,10 +95,11 @@ def obtain_features(dataset_path, store_excel_path=r'./features.csv'):
         for mri_time in os.listdir(path1):
             path2 = os.path.join(path1, mri_time)
             if os.path.isfile(path2): continue
+            clinical_informatin = patients_clinical[f'{patient}+{mri_time}']
             for series in os.listdir(path2):
                 series_path = os.path.join(path2, series)
-                imgs = glob.glob(series_path+"/**.nrrd")
-                rois = glob.glob(series_path+"/**_new.nii.gz")
+                imgs = glob.glob(series_path + "/**.nrrd")
+                rois = glob.glob(series_path + "/**_new.nii.gz")
                 is_T1 = False
                 if 't1' in series.lower():
                     is_T1 = True
@@ -102,29 +107,40 @@ def obtain_features(dataset_path, store_excel_path=r'./features.csv'):
                 if len(imgs) == 0 or len(rois) == 0: continue
                 roi, img = rois[0], imgs[0]
                 print(roi, img)
+
+                print(clinical_informatin)
                 features = get_feature(img, roi, is_T1=is_T1)
+                features.setdefault('name', patient)
+                features.setdefault('time', mri_time)
+
+                for k, v in clinical_informatin.items():
+                    features.setdefault(k, v)
+
                 features_array.append(features)
                 # print(features)
 
     # store dict to store_excel_path
     df = pd.DataFrame(features_array)
-    pd.DataFrame(df).to_csv(store_excel_path)
+    pd.DataFrame(df).to_csv(store_excel_path, index=False)
 
     t2 = time.time()
-    print(f'Finish getting features, time:{t2-t1}')
-
+    print(f'Finish getting features, time:{t2 - t1}')
 
 
 def get_args():
     parser = argparse.ArgumentParser(description='Hyperparameters settings')
-    parser.add_argument('--input-path', '-ip', type=str, default=r'C:\osteosarcoma\bone tumor data', help='datasets path')
-    parser.add_argument('--store-path', '-sp', type=str, default=r'./features.csv', help='the path of output excel')
+    parser.add_argument('--input-path', '-ip', type=str, default=r'C:\Users\12828\Desktop\osteosarcoma\bone tumor data',
+                        help='datasets path')
+    parser.add_argument('--store-path', '-sp', type=str, default=r'./features_dataset.csv',
+                        help='the path of output excel')
 
     return parser.parse_args()
 
 
 if __name__ == '__main__':
     args = get_args()
-    obtain_features(args.input_path, args.store_path)
-
+    patients_clinical = loading_clinical_data()
+    # obtain_features(args.input_path, patients_clinical, args.store_path)
+    image_features, clinical_features, results = loading_dataset(args.store_path)
+    lasso_prediction(image_features, results.iloc[:, 2])
 
