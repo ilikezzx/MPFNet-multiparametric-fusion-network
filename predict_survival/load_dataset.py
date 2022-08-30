@@ -19,7 +19,23 @@ def loading_dataset(dataset_path):
 
     data = data.drop(drop_columns, axis=1)
 
-    image_features, clinical_features, results = data.iloc[:, :851], data.iloc[:, 853:857], data.iloc[:, -3:]
+    # image_features, clinical_features, results = data.iloc[:, :851], data.iloc[:, 853:857], data.iloc[:, -3:]
     # print(data)
 
-    return image_features, clinical_features, results
+    # return image_features, clinical_features, results
+
+
+    train_df = data.sample(frac=0.9, random_state=0, axis=0)
+    test_df = data[~data.index.isin(train_df.index)]
+
+    # train_df = train_df.reset_index(drop=True)
+    # test_df = test_df.reset_index(drop=True)
+
+    train_image_features, train_clinical_features, train_results = \
+        train_df.iloc[:, :851], train_df.iloc[:, 853:857], train_df.iloc[:, -3:]
+
+    test_image_features, test_clinical_features, test_results = \
+        test_df.iloc[:, :851], test_df.iloc[:, 853:857], test_df.iloc[:, -3:]
+
+    return (train_image_features, train_clinical_features, train_results), \
+           (test_image_features, test_clinical_features, test_results)

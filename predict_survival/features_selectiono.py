@@ -10,6 +10,7 @@ Description:
 
 import pandas as pd
 import numpy as np
+import warnings
 
 from sklearn import metrics
 from sklearn.metrics import mean_squared_error
@@ -17,16 +18,24 @@ from sklearn.linear_model import Lasso, LassoCV
 from sklearn.model_selection import StratifiedKFold
 from sklearn.preprocessing import StandardScaler
 
+warnings.filterwarnings("ignore")
+
 
 def evaluate(model, x, y):
-    model_pred = sigmoid(model.predict(x))
-    model_pred[model_pred >= 0.5] = 1
-    model_pred[model_pred < 0.5] = 0
+    model_pred = np.round(sigmoid(model.predict(x))).astype(np.uint8)
+    # model_pred[model_pred >= 0.5] = 1
+    # model_pred[model_pred < 0.5] = 0
+    y = y.values
     # print(metrics.classification_report(y, model_pred))
     cm = metrics.confusion_matrix(y, model_pred)
-    print(f'TP={cm[0,0]}, FN={cm[0,1]}, FP={cm[1,0]}, TN={cm[1,1]}')
+    # print(f'TP={cm[0,0]}, FN={cm[0,1]}, FP={cm[1,0]}, TN={cm[1,1]}')
+    accuracy = metrics.accuracy_score(y, model_pred)
+    recall = metrics.recall_score(y, model_pred)
+    precision = metrics.precision_score(y, model_pred)
+    F1 = metrics.f1_score(y, model_pred)
+    # print("accuracy:", accuracy, "precision:", precision, "recall:", recall, "F1 :", F1)
     RMSE = np.sqrt(mean_squared_error(y, model_pred))
-    return RMSE
+    return RMSE, accuracy, precision, recall, F1
 
 
 def norm_z(x):
@@ -40,26 +49,43 @@ def sigmoid(x):
     return 1 / (1 + np.exp(-x))
 
 
-def lasso_prediction(dataset, dataset_labels):
-    dataset = norm_z(dataset)
-    Lambdas = np.logspace(-5, 2, 200)  # 10的-5到10的2次方   取200个数
-    lasso_cofficients = []
+def lasso_prediction(train_val_x, train_val_labels, test_x, val_labels):
+    train_val_x = norm_z(train_val_x)
+    Lambdas = np.logspace(-6, 0, 200)  # 10的-5到10的2次方   取200个数
+    best_lambda = 0.0
+    max_F1 = 0.0
 
     for Lambda in Lambdas:
-        lasso = Lasso(alpha=Lambda, normalize=True, max_iter=20000)
-        RMSE_metrics = []
-        strtfdKFold = StratifiedKFold(n_splits=10, random_state=2022)
-        kfold = strtfdKFold.split(dataset, dataset_labels)
-        for k, (train, test) in enumerate(kfold):
-            train_data, train_labels = dataset.iloc[train], dataset_labels.iloc[train]
-            test_data, test_labels = dataset.iloc[test], dataset_labels.iloc[test]
+        lasso = Lasso(alpha=Lambda, normalize=True, max_iter=100)
+        RMSE_arr = []
+        acc_arr = []
+        F1_arr = []
+        precision_arr = []
+        recall_arr = []
+        strtfdKFold = StratifiedKFold(n_splits=10, random_state=0)
+        kfold = strtfdKFold.split(train_val_x, train_val_labels)
+        for k, (train, val) in enumerate(kfold):
+            train_data, train_labels = train_val_x.iloc[train], train_val_labels.iloc[train]
+            val_data, val_labels = train_val_x.iloc[val], train_val_labels.iloc[val]
+
             lasso.fit(train_data, train_labels)
-            lasso_cofficients.append(lasso.coef_)
             iter_coef = lasso.coef_
             print(k, " iter Lasso picked " + str(sum(iter_coef != 0)) + " variables and eliminated the other " + str(
                 sum(iter_coef == 0)) + " variables")
-            RMSE = evaluate(lasso, test_data, test_labels)
-            RMSE_metrics.append(RMSE)
+            RMSE, accuracy, precision, recall, F1 = evaluate(lasso, val_data, val_labels)
+            RMSE_arr.append(RMSE), acc_arr.append(accuracy), precision_arr.append(precision), recall_arr.append(recall)
+            F1_arr.append(F1)
 
-        print('Lambda:', Lambda, "Mean RMSE:", np.array(RMSE_metrics).mean())
+        if max_F1 < np.array(F1_arr).mean():
+            max_F1 = np.array(F1_arr).mean()
+            best_lambda = Lambda
+
+        print('Lambda:', Lambda, "Mean RMSE:", np.array(RMSE_arr).mean(), "Mean F1-score:", np.array(F1_arr).mean(),
+              'Mean accuracy:', np.array(acc_arr).mean(), 'Mean Recall:', np.array(recall_arr).mean(),
+              'Mean precision:', np.array(precision_arr).mean())
         print('*' * 20)
+
+
+
+
+
