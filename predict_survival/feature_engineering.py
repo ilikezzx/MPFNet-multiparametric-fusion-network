@@ -132,7 +132,7 @@ def obtain_features(dataset_path, patients_clinical, store_excel_path=r'./featur
 
 def get_args():
     parser = argparse.ArgumentParser(description='Hyperparameters settings')
-    parser.add_argument('--input-path', '-ip', type=str, default=r'C:\Users\12828\Desktop\osteosarcoma\bone tumor data',
+    parser.add_argument('--input-path', '-ip', type=str, default=r'C:\osteosarcoma\bone tumor data',
                         help='datasets path')
     parser.add_argument('--store-path', '-sp', type=str, default=r'./features_dataset-3.csv',
                         help='the path of output excel')
@@ -142,7 +142,7 @@ def get_args():
 
 if __name__ == '__main__':
     args = get_args()
-    patients_clinical = loading_clinical_data()
+    # patients_clinical = loading_clinical_data()
     # obtain_features(args.input_path, patients_clinical, args.store_path)
     # image_features, clinical_features, results = loading_dataset(args.store_path)
     # lasso_prediction(image_features, results.iloc[:, 0])

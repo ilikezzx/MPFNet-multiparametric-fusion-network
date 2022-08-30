@@ -18,14 +18,14 @@ def loading_dataset(dataset_path):
     drop_columns = data.columns[0: drop_index + 1]
 
     data = data.drop(drop_columns, axis=1)
+    print(data['five_years_survival'].value_counts(ascending=True))
 
     # image_features, clinical_features, results = data.iloc[:, :851], data.iloc[:, 853:857], data.iloc[:, -3:]
     # print(data)
 
     # return image_features, clinical_features, results
 
-
-    train_df = data.sample(frac=0.9, random_state=0, axis=0)
+    train_df = data.sample(frac=0.9, random_state=4333, axis=0)
     test_df = data[~data.index.isin(train_df.index)]
 
     # train_df = train_df.reset_index(drop=True)

@@ -11,12 +11,14 @@ Description:
 import pandas as pd
 import numpy as np
 import warnings
+import matplotlib.pyplot as plt
 
 from sklearn import metrics
 from sklearn.metrics import mean_squared_error
 from sklearn.linear_model import Lasso, LassoCV
 from sklearn.model_selection import StratifiedKFold
 from sklearn.preprocessing import StandardScaler
+from imblearn.over_sampling import SMOTE, SVMSMOTE    # 过采样包
 
 warnings.filterwarnings("ignore")
 
@@ -49,20 +51,26 @@ def sigmoid(x):
     return 1 / (1 + np.exp(-x))
 
 
-def lasso_prediction(train_val_x, train_val_labels, test_x, val_labels):
+def lasso_prediction(train_val_x, train_val_labels, test_x, test_labels):
     train_val_x = norm_z(train_val_x)
-    Lambdas = np.logspace(-6, 0, 200)  # 10的-5到10的2次方   取200个数
+    smo = SVMSMOTE(n_jobs=-1)
+
+    # 使用SMOTE进行过采样时正样本和负样本要放在一起，生成比例1：1的数据
+    train_val_x, train_val_labels = smo.fit_resample(train_val_x, train_val_labels)
+
+    test_x = norm_z(test_x)
+    Lambdas = np.logspace(-5, 0, 50)  # 10的-5到10的2次方   取200个数
     best_lambda = 0.0
     max_F1 = 0.0
 
     for Lambda in Lambdas:
-        lasso = Lasso(alpha=Lambda, normalize=True, max_iter=100)
         RMSE_arr = []
         acc_arr = []
         F1_arr = []
         precision_arr = []
         recall_arr = []
-        strtfdKFold = StratifiedKFold(n_splits=10, random_state=0)
+        lasso = Lasso(alpha=Lambda, normalize=True, max_iter=1000)
+        strtfdKFold = StratifiedKFold(n_splits=10, shuffle=True, random_state=0)
         kfold = strtfdKFold.split(train_val_x, train_val_labels)
         for k, (train, val) in enumerate(kfold):
             train_data, train_labels = train_val_x.iloc[train], train_val_labels.iloc[train]
@@ -85,7 +93,19 @@ def lasso_prediction(train_val_x, train_val_labels, test_x, val_labels):
               'Mean precision:', np.array(precision_arr).mean())
         print('*' * 20)
 
+    print(max_F1, best_lambda)
+    best_lasso = Lasso(alpha=best_lambda, normalize=True, max_iter=10000)
+    best_lasso.fit(train_val_x, train_val_labels)
+    RMSE, accuracy, precision, recall, F1 = evaluate(best_lasso, test_x, test_labels)
 
+    print(RMSE, accuracy, precision, recall, F1)
 
+    coef = pd.Series(best_lasso.coef_, index=best_lasso.feature_names_in_)
+    print(coef)
 
-
+    imp_coef = pd.concat([coef.sort_values().head(10),
+                          coef.sort_values().tail(10)])
+    plt.rcParams['figure.figsize'] = (8.0, 10.0)
+    imp_coef.plot(kind="barh")
+    plt.title("Coefficients in the Lasso Model")
+    plt.show()
