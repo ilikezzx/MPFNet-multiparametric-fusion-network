@@ -8,9 +8,10 @@ Description:
     尝试各种特征选择方式
 """
 
+import yaml
+import warnings
 import pandas as pd
 import numpy as np
-import warnings
 import matplotlib.pyplot as plt
 
 from sklearn import metrics
@@ -18,7 +19,6 @@ from sklearn.metrics import mean_squared_error
 from sklearn.linear_model import Lasso, LassoCV
 from sklearn.model_selection import StratifiedKFold
 from sklearn.preprocessing import StandardScaler
-from imblearn.over_sampling import SMOTE, SVMSMOTE    # 过采样包
 
 warnings.filterwarnings("ignore")
 
@@ -40,26 +40,13 @@ def evaluate(model, x, y):
     return RMSE, accuracy, precision, recall, F1
 
 
-def norm_z(x):
-    # 归一化
-    scaler = StandardScaler()
-    x = pd.DataFrame(scaler.fit_transform(x), columns=x.columns)
-    return x
-
 
 def sigmoid(x):
     return 1 / (1 + np.exp(-x))
 
 
 def lasso_prediction(train_val_x, train_val_labels, test_x, test_labels):
-    train_val_x = norm_z(train_val_x)
-    smo = SVMSMOTE(n_jobs=-1)
-
-    # 使用SMOTE进行过采样时正样本和负样本要放在一起，生成比例1：1的数据
-    train_val_x, train_val_labels = smo.fit_resample(train_val_x, train_val_labels)
-
-    test_x = norm_z(test_x)
-    Lambdas = np.logspace(-5, 0, 50)  # 10的-5到10的2次方   取200个数
+    Lambdas = np.logspace(-5, 0, 100)  # 10的-5到10的2次方   取200个数
     best_lambda = 0.0
     max_F1 = 0.0
 
@@ -94,18 +81,35 @@ def lasso_prediction(train_val_x, train_val_labels, test_x, test_labels):
         print('*' * 20)
 
     print(max_F1, best_lambda)
+
+    # best_lambda = 1.2648552168552958e-05
     best_lasso = Lasso(alpha=best_lambda, normalize=True, max_iter=10000)
     best_lasso.fit(train_val_x, train_val_labels)
     RMSE, accuracy, precision, recall, F1 = evaluate(best_lasso, test_x, test_labels)
 
     print(RMSE, accuracy, precision, recall, F1)
 
-    coef = pd.Series(best_lasso.coef_, index=best_lasso.feature_names_in_)
-    print(coef)
+    nonzeros_coef_array = []
+    for coef_value, column_name in zip(best_lasso.coef_, train_val_x.columns):
+        if coef_value != 0:
+            nonzeros_coef_array.append((column_name, coef_value))
+            print(f'{column_name}:{coef_value}')
 
-    imp_coef = pd.concat([coef.sort_values().head(10),
-                          coef.sort_values().tail(10)])
-    plt.rcParams['figure.figsize'] = (8.0, 10.0)
-    imp_coef.plot(kind="barh")
-    plt.title("Coefficients in the Lasso Model")
-    plt.show()
+    print('save features number:', len(nonzeros_coef_array))
+
+    # store features array
+    with open('./retain_features_set.yaml', 'w') as f:
+        yaml.dump(nonzeros_coef_array, f)
+
+    return nonzeros_coef_array
+
+    # 展示正负相关性最高的10个特征
+    # coef = pd.Series(best_lasso.coef_, index=train_val_x.columns)
+    # imp_coef = pd.concat([coef.sort_values().head(10),
+    #                       coef.sort_values().tail(10)])
+    #
+    # print(imp_coef)
+    # plt.rcParams['figure.figsize'] = (8.0, 10.0)
+    # imp_coef.plot(kind="barh")
+    # plt.title("Coefficients in the Lasso Model")
+    # plt.show()
