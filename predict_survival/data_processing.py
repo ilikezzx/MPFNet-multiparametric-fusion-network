@@ -10,7 +10,8 @@ Description:
 """
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
-from imblearn.over_sampling import SMOTE, SVMSMOTE    # 过采样包
+from imblearn.over_sampling import SMOTE, SVMSMOTE  # 过采样包
+
 
 def norm_z(x):
     # 归一化
@@ -40,4 +41,3 @@ def processing(train_image_features, train_clinical_features, train_results,
 
     return (train_image_features, train_clinical_features, train_results), \
            (test_image_features, test_clinical_features, test_results)
-

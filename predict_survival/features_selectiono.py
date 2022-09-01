@@ -8,7 +8,6 @@ Description:
     尝试各种特征选择方式
 """
 
-import yaml
 import warnings
 import pandas as pd
 import numpy as np
@@ -45,7 +44,7 @@ def sigmoid(x):
     return 1 / (1 + np.exp(-x))
 
 
-def lasso_prediction(train_val_x, train_val_labels, test_x, test_labels):
+def lasso_prediction(train_val_x, train_val_labels, test_x, test_labels, retain_features_txt_path=r'./retain_features_set.txt'):
     Lambdas = np.logspace(-5, 0, 100)  # 10的-5到10的2次方   取200个数
     best_lambda = 0.0
     max_F1 = 0.0
@@ -98,8 +97,13 @@ def lasso_prediction(train_val_x, train_val_labels, test_x, test_labels):
     print('save features number:', len(nonzeros_coef_array))
 
     # store features array
-    with open('./retain_features_set.yaml', 'w') as f:
-        yaml.dump(nonzeros_coef_array, f)
+    with open(retain_features_txt_path, 'w') as f:
+        for col_name, coef_value in nonzeros_coef_array:
+            f.write(f'{col_name}:{coef_value}\n')
+
+    with open(retain_features_txt_path[:-4]+"_name.txt", 'w') as f:
+        for col_name, coef_value in nonzeros_coef_array:
+            f.write(f'{col_name}\n')
 
     return nonzeros_coef_array
 

@@ -25,11 +25,11 @@ def loading_dataset(dataset_path):
 
     # return image_features, clinical_features, results
 
-    train_df = data.sample(frac=0.9, random_state=4333, axis=0)
+    train_df = data.sample(frac=0.8, random_state=4433, axis=0)
     test_df = data[~data.index.isin(train_df.index)]
 
-    # train_df = train_df.reset_index(drop=True)
-    # test_df = test_df.reset_index(drop=True)
+    train_df = train_df.reset_index(drop=True)
+    test_df = test_df.reset_index(drop=True)
 
     train_image_features, train_clinical_features, train_results = \
         train_df.iloc[:, :851], train_df.iloc[:, 853:857], train_df.iloc[:, -3:]

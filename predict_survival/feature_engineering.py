@@ -33,11 +33,12 @@ from sklearn.model_selection import train_test_split
 
 def get_args():
     parser = argparse.ArgumentParser(description='Hyperparameters settings')
-    parser.add_argument('--input-path', '-ip', type=str, default=r'C:\Users\12828\Desktop\osteosarcoma\bone tumor data',
+    parser.add_argument('--father-path', '-fp', type=str, default=r'C:\osteosarcoma\os_survival')
+    parser.add_argument('--input-path', '-ip', type=str, default=r'C:\osteosarcoma\bone tumor data',
                         help='datasets path')
     parser.add_argument('--store-path', '-sp', type=str, default=r'./features_dataset-3.csv',
                         help='the path of output excel')
-    parser.add_argument('--retain-features-yaml-path', '-rfyp', type=str, default=r'./retain_features_set.yaml',
+    parser.add_argument('--retain-features-txt-path', '-rftp', type=str, default=r'retain_features_set.txt',
                         help='retain features array')
 
     return parser.parse_args()
@@ -61,9 +62,16 @@ if __name__ == '__main__':
                                                                              test_image_features, test_clinical_features, test_results)
 
     # 利用Lasso进行特征选择
-    nonzeros_coef_array = lasso_prediction(train_image_features, train_results, test_image_features, test_results)
+    nonzeros_coef_array = lasso_prediction(train_image_features, train_results, test_image_features, test_results,
+                                           os.path.join(args.father_path, args.retain_features_txt_path))
+    col_names = np.array(nonzeros_coef_array)[:, 0]
 
-    # 读取筛选后的特征集
+    # 保存筛选后的特征集
+    trainset = pd.concat([train_image_features[col_names], train_results], axis=1)
+    testset = pd.concat([test_image_features[col_names], test_results], axis=1)
+    trainset.to_csv(os.path.join(args.father_path, 'trainset.csv'), index=False)
+    testset.to_csv(os.path.join(args.father_path, 'testset.csv'), index=False)
+    print(trainset, testset)
 
 
 
