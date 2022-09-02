@@ -24,11 +24,11 @@ def processing(train_image_features, train_clinical_features, train_results,
                test_image_features, test_clinical_features, test_results):
     # 归一化训练集
     train_image_features = norm_z(train_image_features)
-    train_clinical_features = norm_z(train_clinical_features)
+    # train_clinical_features = norm_z(train_clinical_features)
 
     # 归一化测试集
     test_image_features = norm_z(test_image_features)
-    test_clinical_features = norm_z(test_clinical_features)
+    # test_clinical_features = norm_z(test_clinical_features)
 
     # 只取第5年生存率  用于最后的预测
     train_results = train_results.iloc[:, 2]
@@ -37,7 +37,10 @@ def processing(train_image_features, train_clinical_features, train_results,
     # SMOTH-svm 重采样技术
     smo = SVMSMOTE(n_jobs=-1)
     # 使用SMOTE进行过采样时正样本和负样本要放在一起，生成比例1：1的数据
-    train_image_features, train_results = smo.fit_resample(train_image_features, train_results)
+    tmp_dataset = pd.concat([train_image_features, train_clinical_features], axis=1)
+    train_features, train_results = smo.fit_resample(tmp_dataset, train_results)
+    train_image_features = train_features.iloc[:, :-4]
+    train_clinical_features = train_features.iloc[:, -4:].round()
 
     return (train_image_features, train_clinical_features, train_results), \
            (test_image_features, test_clinical_features, test_results)

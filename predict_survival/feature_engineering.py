@@ -28,6 +28,7 @@ from features_selectiono import lasso_prediction
 from data_processing import processing
 from obtain_features import obtain_features
 
+from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
 
 
@@ -54,12 +55,14 @@ if __name__ == '__main__':
 
     # 划分数据集
     (train_image_features, train_clinical_features, train_results), \
-        (test_image_features, test_clinical_features, test_results) = loading_dataset(args.store_path)
+    (test_image_features, test_clinical_features, test_results) = loading_dataset(args.store_path)
 
     # 数据集归一化以及重采样，增加正样本数量
     (train_image_features, train_clinical_features, train_results), \
-    (test_image_features, test_clinical_features, test_results) = processing(train_image_features, train_clinical_features, train_results,
-                                                                             test_image_features, test_clinical_features, test_results)
+    (test_image_features, test_clinical_features, test_results) = processing(train_image_features,
+                                                                             train_clinical_features, train_results,
+                                                                             test_image_features,
+                                                                             test_clinical_features, test_results)
 
     # 利用Lasso进行特征选择
     nonzeros_coef_array = lasso_prediction(train_image_features, train_results, test_image_features, test_results,
@@ -69,9 +72,16 @@ if __name__ == '__main__':
     # 保存筛选后的特征集
     trainset = pd.concat([train_image_features[col_names], train_results], axis=1)
     testset = pd.concat([test_image_features[col_names], test_results], axis=1)
-    trainset.to_csv(os.path.join(args.father_path, 'trainset.csv'), index=False)
-    testset.to_csv(os.path.join(args.father_path, 'testset.csv'), index=False)
-    print(trainset, testset)
+    # trainset.to_csv(os.path.join(args.father_path, 'trainset.csv'), index=False)
+    # testset.to_csv(os.path.join(args.father_path, 'testset.csv'), index=False)
 
+    # Logistic回归获取影像组特征信息
+    clf = LogisticRegression(random_state=0).fit(train_image_features[col_names], train_results)
+    train_scores = pd.DataFrame(clf.predict_proba(train_image_features[col_names])[:, 1], columns=['Logistic_Score'])
+    test_scores = pd.DataFrame(clf.predict_proba(test_image_features[col_names])[:, 1], columns=['Logistic_Score'])
 
+    trainset_result = pd.concat([train_clinical_features, train_scores, train_results], axis=1)
+    testset_result = pd.concat([test_clinical_features, test_scores, test_results], axis=1)
 
+    trainset_result.to_csv(os.path.join(args.father_path, 'trainset_result.csv'), index=False)
+    testset_result.to_csv(os.path.join(args.father_path, 'testset_result.csv'), index=False)
