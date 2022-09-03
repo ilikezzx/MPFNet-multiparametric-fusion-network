@@ -1,11 +1,26 @@
+# 下载程序包
+install.packages("installr")
+library(installr)
+updateR()
+
+install.packages('car')
+install.packages('rms')
+install.packages('pROC')
+install.packages("devtools")
+install.packages("rmda")
+install.packages("dplyr")
+
+library(devtools)
+install_github("mdbrown/DecisionCurve")
+
 rm(list=ls()) # 清空数据
 library(car)
 library(rms)   ###加载rms包#
 library(pROC)
 library(rmda)
 
-data_dir <- choose.dir(default = "C:\\osteosarcoma\\os_survival", caption = "选择数据存放的文件夹目录")
-output_dir <- choose.dir(default = "C:\\osteosarcoma\\os_survival", caption = "选择导出图片的文件夹目录")
+data_dir <- choose.dir(default = "C:\\Users\\12828\\Desktop\\osteosarcoma\\os_survival", caption = "选择数据存放的文件夹目录")
+output_dir <- choose.dir(default = "C:\\Users\\12828\\Desktop\\os_survival", caption = "选择导出图片的文件夹目录")
 
 # 读取训练集和测试集
 training_dataset_path <- choose.files(default = data_dir, caption = "请选训练集数据文件的csv文件。",
@@ -31,12 +46,12 @@ ddist <- datadist(training_dataset)
 options(datadist='ddist')
 
 
-f <- lrm(five_years_survival~ sex+post_chemotherapy+lung_metastases+Logistic_Score,data=training_dataset, x=TRUE, y=TRUE,maxit=1000)   
+f <- lrm(five_years_survival~ sex+post_chemotherapy+lung_metastases+Logistic_Score,data=training_dataset, x=TRUE, y=TRUE,maxit=100)   
 summary(f)   # 也能用此函数看具体模型情况，模型的系数，置信区间等
 print(f)
 
 #nomogram计算部分，此处的f_lrm及对应的多因素logistic回归函数。
-pdf(file=paste("./nomogram.pdf", sep = ""),width=10,height=5) 
+pdf(file=paste(output_dir, "\\nomogram.pdf", sep = ""),width=10,height=5) 
 nomogram <- nomogram(f,fun=function(x)1/(1+exp(-x)), ##逻辑回归计算公式
                      fun.at = c(0.01,0.1,0.3,0.5,0.8,0.9,0.99),#风险轴刻度
                      funlabel = "Prob of death", #风险轴便签

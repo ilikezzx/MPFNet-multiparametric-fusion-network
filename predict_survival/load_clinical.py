@@ -20,11 +20,11 @@ def loading_clinical_data():
 
     items = data.values
     for index, item in enumerate(items):
-        name, sex, age, _, _, post_chemotherapy, lung_metastases, is_survival = item[:-1]  # 不包含位置的全部信息
+        name, sex, age, lung_metastases, is_survival = item[:-1]  # 不包含位置的全部信息
 
         assert sex in ['男', '女'], f'Please check {index + 1} item, "sex" is {sex}'
-        assert post_chemotherapy[0] in ['是',
-                                        '否'], f'Please check {index + 1} item, "post_chemotherapy" is {post_chemotherapy}'
+        # assert post_chemotherapy[0] in ['是',
+        #                                 '否'], f'Please check {index + 1} item, "post_chemotherapy" is {post_chemotherapy}'
         assert lung_metastases[0] in ['是',
                                       '否'], f'Please check {index + 1} item, "lung_metastases" is {lung_metastases}'
         assert str(is_survival).startswith('生存') or str(is_survival).startswith(
@@ -35,10 +35,10 @@ def loading_clinical_data():
         else:
             sex = 0
 
-        if post_chemotherapy[0] == '是':
-            post_chemotherapy = 1
-        else:
-            post_chemotherapy = 0
+        # if post_chemotherapy[0] == '是':
+        #     post_chemotherapy = 1
+        # else:
+        #     post_chemotherapy = 0
 
         if lung_metastases[0] == '是':
             lung_metastases = 1
@@ -55,7 +55,7 @@ def loading_clinical_data():
             three_years_survival = 1 if year > 3 else 0
             five_years_survival = 1 if year > 5 else 0
 
-        tmp = {'sex': sex, 'age': age, 'post_chemotherapy': post_chemotherapy, 'lung_metastases': lung_metastases,
+        tmp = {'sex': sex, 'age': age, 'lung_metastases': lung_metastases,
                'one_year_survival': one_year_survival, 'three_years_survival': three_years_survival,
                'five_years_survival': five_years_survival}
         # print(item)

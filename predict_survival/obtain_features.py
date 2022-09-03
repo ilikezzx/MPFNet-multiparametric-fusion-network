@@ -69,7 +69,7 @@ def get_feature(img_path, roi_path, is_T1=True, is_construct=False):
     # Define settings for signature calculation
     # These are currently set equal to the respective default values
     settings = {'binWidth': 25, 'correctMask': True, 'label': 1, 'normalize': True, 'Interpolator': sitk.sitkBSpline,
-                'resampledPixelSpacing': [3, 3, 3]}
+                'resampledPixelSpacing': resampledPixelSpacing}
     # [h,w,z] for defining resampling (voxels with size h x w x z mm)
     # Initialize feature extractor
     extractor = featureextractor.RadiomicsFeatureExtractor(**settings)
@@ -107,6 +107,7 @@ def obtain_features(dataset_path, patients_clinical, store_excel_path=r'./featur
                 features = get_feature(img, roi, is_T1=is_T1)
                 features.setdefault('name', patient)
                 features.setdefault('time', mri_time)
+                features.setdefault('volume', float(features['original_shape_MeshVolume'])/1000.0)
 
                 for k, v in clinical_informatin.items():
                     features.setdefault(k, v)
