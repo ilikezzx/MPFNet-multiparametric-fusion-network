@@ -83,6 +83,7 @@ def convert_series(dcm_dir, pics_name='images'):
     if not os.path.exists(img_dir):
         os.mkdir(img_dir)
     else:
+        return
         shutil.rmtree(img_dir)
         os.mkdir(img_dir)
 
@@ -127,7 +128,7 @@ def convert_series(dcm_dir, pics_name='images'):
 
 
 if __name__ == '__main__':
-    ori_dir = r'C:\osteosarcoma\bone tumor data'
+    ori_dir = r'C:\Users\12828\Desktop\osteosarcoma\bone tumor data'
     for patient_name in os.listdir(ori_dir):
         second_path = os.path.join(ori_dir, patient_name)
         for mri_time in os.listdir(second_path):

@@ -114,5 +114,5 @@ if __name__ == '__main__':
     #             # print(is_positive, (patient_name, mri_time, series_num))
     #             convert(forth_path, is_positive=True)
 
-    ori_dir = r'C:\osteosarcoma\bone tumor data\1405391 luojian 2\20180328MRI\S14 t1 enhance tra 1'
+    ori_dir = r'C:\Users\12828\Desktop\osteosarcoma\bone tumor data\1300137 tanzhiwen\20170411MRI\S10 t1 enhance tra 2'
     convert(ori_dir, is_Test=False)

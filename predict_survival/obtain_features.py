@@ -34,6 +34,7 @@ def reconstruct_mask(roi_path, is_T1=True):
     print(u)
     if is_T1:
         mask[mask != 0] = 1  # 坏死区域可看做肿瘤区域
+        # mask[mask > 1] = 0
     else:
         mask[mask > 1] = 0  # 水肿区域不可看做肿瘤区域
 
@@ -56,30 +57,32 @@ def get_feature(img_path, roi_path, is_T1=True, is_construct=False):
     """
     if is_construct:
         reconstruct_mask(roi_path, is_T1)
+        return None
 
-    dicom = sitk.ReadImage(img_path)
-    # 像素比例长宽高信息
-    resampledPixelSpacing = dicom.GetSpacing()
-    # Get the PyRadiomics logger (default log-level = INFO)
-    # 消除无关警告。
-    logger = radiomics.logger
-    logger.setLevel(logging.DEBUG)  # set level to DEBUG to include debug log messages in log file
-    logger = logging.getLogger("radiomics.glcm")
-    logger.setLevel(logging.ERROR)
-    # Define settings for signature calculation
-    # These are currently set equal to the respective default values
-    settings = {'binWidth': 25, 'correctMask': True, 'label': 1, 'normalize': True, 'Interpolator': sitk.sitkBSpline,
-                'resampledPixelSpacing': resampledPixelSpacing}
-    # [h,w,z] for defining resampling (voxels with size h x w x z mm)
-    # Initialize feature extractor
-    extractor = featureextractor.RadiomicsFeatureExtractor(**settings)
+    else:
+        dicom = sitk.ReadImage(img_path)
+        # 像素比例长宽高信息
+        resampledPixelSpacing = dicom.GetSpacing()
+        # Get the PyRadiomics logger (default log-level = INFO)
+        # 消除无关警告。
+        logger = radiomics.logger
+        logger.setLevel(logging.DEBUG)  # set level to DEBUG to include debug log messages in log file
+        logger = logging.getLogger("radiomics.glcm")
+        logger.setLevel(logging.ERROR)
+        # Define settings for signature calculation
+        # These are currently set equal to the respective default values
+        settings = {'binWidth': 25, 'correctMask': True, 'label': 1, 'normalize': True, 'Interpolator': sitk.sitkBSpline,
+                    'resampledPixelSpacing': resampledPixelSpacing}
+        # [h,w,z] for defining resampling (voxels with size h x w x z mm)
+        # Initialize feature extractor
+        extractor = featureextractor.RadiomicsFeatureExtractor(**settings)
 
-    # By default, only original is enabled. Optionally enable some image types: 原图，高斯滤波，小波变换
-    extractor.enableImageTypes(Original={}, LoG={}, Wavelet={})
+        # By default, only original is enabled. Optionally enable some image types: 原图，高斯滤波，小波变换
+        extractor.enableImageTypes(Original={}, LoG={}, Wavelet={})
 
-    # print("Calculating features")
-    featureVector = extractor.execute(img_path, roi_path)
-    return featureVector
+        # print("Calculating features")
+        featureVector = extractor.execute(img_path, roi_path)
+        return featureVector
 
 
 def obtain_features(dataset_path, patients_clinical, store_excel_path=r'./features.csv'):
@@ -90,6 +93,7 @@ def obtain_features(dataset_path, patients_clinical, store_excel_path=r'./featur
         for mri_time in os.listdir(path1):
             path2 = os.path.join(path1, mri_time)
             if os.path.isfile(path2): continue
+            if f'{patient}+{mri_time}' not in patients_clinical.keys(): continue
             clinical_informatin = patients_clinical[f'{patient}+{mri_time}']
             for series in os.listdir(path2):
                 series_path = os.path.join(path2, series)
@@ -107,7 +111,10 @@ def obtain_features(dataset_path, patients_clinical, store_excel_path=r'./featur
                 features = get_feature(img, roi, is_T1=is_T1)
                 features.setdefault('name', patient)
                 features.setdefault('time', mri_time)
-                features.setdefault('volume', float(features['original_shape_MeshVolume'])/1000.0)
+                features.setdefault('volume', float(features['original_shape_Maximum2DDiameterColumn']*
+                                                    features['original_shape_Maximum2DDiameterRow']*
+                                                    features['original_shape_Maximum2DDiameterSlice'])
+                                    /6000*3.1415926)
 
                 for k, v in clinical_informatin.items():
                     features.setdefault(k, v)

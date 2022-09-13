@@ -49,44 +49,46 @@ def lasso_prediction(train_val_x, train_val_labels, test_x, test_labels, retain_
     best_lambda = 0.0
     max_F1 = 0.0
 
-    for Lambda in Lambdas:
-        RMSE_arr = []
-        acc_arr = []
-        F1_arr = []
-        precision_arr = []
-        recall_arr = []
-        lasso = Lasso(alpha=Lambda, normalize=True, max_iter=1000)
-        strtfdKFold = StratifiedKFold(n_splits=10, shuffle=True, random_state=0)
-        kfold = strtfdKFold.split(train_val_x, train_val_labels)
-        for k, (train, val) in enumerate(kfold):
-            train_data, train_labels = train_val_x.iloc[train], train_val_labels.iloc[train]
-            val_data, val_labels = train_val_x.iloc[val], train_val_labels.iloc[val]
+    # for Lambda in Lambdas:
+    #     RMSE_arr = []
+    #     acc_arr = []
+    #     F1_arr = []
+    #     precision_arr = []
+    #     recall_arr = []
+    #     lasso = Lasso(alpha=Lambda, normalize=True, max_iter=1000)
+    #     strtfdKFold = StratifiedKFold(n_splits=10, shuffle=True, random_state=0)
+    #     kfold = strtfdKFold.split(train_val_x, train_val_labels)
+    #     for k, (train, val) in enumerate(kfold):
+    #         train_data, train_labels = train_val_x.iloc[train], train_val_labels.iloc[train]
+    #         val_data, val_labels = train_val_x.iloc[val], train_val_labels.iloc[val]
+    #
+    #         lasso.fit(train_data, train_labels)
+    #         iter_coef = lasso.coef_
+    #         print(k, " iter Lasso picked " + str(sum(iter_coef != 0)) + " variables and eliminated the other " + str(
+    #             sum(iter_coef == 0)) + " variables")
+    #         RMSE, accuracy, precision, recall, F1 = evaluate(lasso, val_data, val_labels)
+    #         RMSE_arr.append(RMSE), acc_arr.append(accuracy), precision_arr.append(precision), recall_arr.append(recall)
+    #         F1_arr.append(F1)
+    #
+    #     if max_F1 < np.array(F1_arr).mean():
+    #         max_F1 = np.array(F1_arr).mean()
+    #         best_lambda = Lambda
+    #
+    #     print('Lambda:', Lambda, "Mean RMSE:", np.array(RMSE_arr).mean(), "Mean F1-score:", np.array(F1_arr).mean(),
+    #           'Mean accuracy:', np.array(acc_arr).mean(), 'Mean Recall:', np.array(recall_arr).mean(),
+    #           'Mean precision:', np.array(precision_arr).mean())
+    #     print('*' * 20)
+    #
+    # print(max_F1, best_lambda)
+    #
+    # # best_lambda = 1.2648552168552958e-05
+    # best_lasso = Lasso(alpha=best_lambda, normalize=True, max_iter=10000)
+    # best_lasso.fit(train_val_x, train_val_labels)
+    # RMSE, accuracy, precision, recall, F1 = evaluate(best_lasso, test_x, test_labels)
+    #
+    # print(RMSE, accuracy, precision, recall, F1)
 
-            lasso.fit(train_data, train_labels)
-            iter_coef = lasso.coef_
-            print(k, " iter Lasso picked " + str(sum(iter_coef != 0)) + " variables and eliminated the other " + str(
-                sum(iter_coef == 0)) + " variables")
-            RMSE, accuracy, precision, recall, F1 = evaluate(lasso, val_data, val_labels)
-            RMSE_arr.append(RMSE), acc_arr.append(accuracy), precision_arr.append(precision), recall_arr.append(recall)
-            F1_arr.append(F1)
-
-        if max_F1 < np.array(F1_arr).mean():
-            max_F1 = np.array(F1_arr).mean()
-            best_lambda = Lambda
-
-        print('Lambda:', Lambda, "Mean RMSE:", np.array(RMSE_arr).mean(), "Mean F1-score:", np.array(F1_arr).mean(),
-              'Mean accuracy:', np.array(acc_arr).mean(), 'Mean Recall:', np.array(recall_arr).mean(),
-              'Mean precision:', np.array(precision_arr).mean())
-        print('*' * 20)
-
-    print(max_F1, best_lambda)
-
-    # best_lambda = 1.2648552168552958e-05
-    best_lasso = Lasso(alpha=best_lambda, normalize=True, max_iter=10000)
-    best_lasso.fit(train_val_x, train_val_labels)
-    RMSE, accuracy, precision, recall, F1 = evaluate(best_lasso, test_x, test_labels)
-
-    print(RMSE, accuracy, precision, recall, F1)
+    best_lasso = LassoCV(normalize=True, alphas=Lambdas, cv=10).fit(train_val_x, train_val_labels)
 
     nonzeros_coef_array = []
     for coef_value, column_name in zip(best_lasso.coef_, train_val_x.columns):

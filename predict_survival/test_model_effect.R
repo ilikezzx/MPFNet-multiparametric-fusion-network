@@ -1,26 +1,27 @@
 # 下载程序包
-install.packages("installr")
-library(installr)
-updateR()
+# install.packages('car')
+# install.packages('rms')
+# install.packages('pROC')
+# install.packages("devtools")
+# install.packages("rmda")
+# install.packages("dplyr", type="binary")
+# install.packages("xgboost")
+install.packages("randomForest")
 
-install.packages('car')
-install.packages('rms')
-install.packages('pROC')
-install.packages("devtools")
-install.packages("rmda")
-install.packages("dplyr")
 
-library(devtools)
-install_github("mdbrown/DecisionCurve")
+# library(devtools)
+# install_github("mdbrown/DecisionCurve")
 
 rm(list=ls()) # 清空数据
 library(car)
 library(rms)   ###加载rms包#
 library(pROC)
 library(rmda)
+library(xgboost)      # boost向量
+library(randomForest) # 随机森林
 
 data_dir <- choose.dir(default = "C:\\Users\\12828\\Desktop\\osteosarcoma\\os_survival", caption = "选择数据存放的文件夹目录")
-output_dir <- choose.dir(default = "C:\\Users\\12828\\Desktop\\os_survival", caption = "选择导出图片的文件夹目录")
+output_dir <- choose.dir(default = "C:\\Users\\12828\\Desktop\\osteosarcoma\\os_survival", caption = "选择导出图片的文件夹目录")
 
 # 读取训练集和测试集
 training_dataset_path <- choose.files(default = data_dir, caption = "请选训练集数据文件的csv文件。",
@@ -46,15 +47,15 @@ ddist <- datadist(training_dataset)
 options(datadist='ddist')
 
 
-f <- lrm(five_years_survival~ sex+post_chemotherapy+lung_metastases+Logistic_Score,data=training_dataset, x=TRUE, y=TRUE,maxit=100)   
+f <- lrm(five_years_survival~ age+sex+lung_metastases+Logistic_Score,data=training_dataset, x=TRUE, y=TRUE)   
 summary(f)   # 也能用此函数看具体模型情况，模型的系数，置信区间等
 print(f)
 
 #nomogram计算部分，此处的f_lrm及对应的多因素logistic回归函数。
-pdf(file=paste(output_dir, "\\nomogram.pdf", sep = ""),width=10,height=5) 
+pdf(file=paste(output_dir, "\\nomogram.pdf", sep = ""),width=10,height=8) 
 nomogram <- nomogram(f,fun=function(x)1/(1+exp(-x)), ##逻辑回归计算公式
-                     fun.at = c(0.01,0.1,0.3,0.5,0.8,0.9,0.99),#风险轴刻度
-                     funlabel = "Prob of death", #风险轴便签
+                     fun.at = c(0.01,0.1,0.5,0.8,0.99),#风险轴刻度
+                     funlabel = "Prob of survival", #风险轴便签
                      lp=F,  ##是否显示系数轴
                      conf.int = F, ##每个得分的置信度区间，用横线表示,横线越长置信度越
                      abbrev = F#是否用简称代表因子变量
@@ -100,7 +101,7 @@ dev.off()
 
 ##训练集决策曲线DCA
 pdf(file=paste(output_dir, "\\DCA_training.pdf", sep = ""),width=10,height=10) 
-DCA_training<- decision_curve(five_years_survival ~ sex+post_chemotherapy+lung_metastases+Logistic_Score
+DCA_training<- decision_curve(five_years_survival ~ age+sex+lung_metastases+Logistic_Score
                               ,data = training_dataset
                               #,policy = "opt-in"
                               ,study.design = 'cohort')
@@ -109,7 +110,7 @@ dev.off()
 
 #验证集决策曲线DCA
 pdf(file=paste(output_dir, "\\DCA_testing.pdf", sep = ""),width=10,height=10) 
-DCA_training<- decision_curve(five_years_survival ~ sex+post_chemotherapy+lung_metastases+Logistic_Score
+DCA_training<- decision_curve(five_years_survival ~ age+sex+lung_metastases+Logistic_Score
                               ,data = validation_dataset
                               #,policy = "opt-in"
                               ,study.design = 'cohort')

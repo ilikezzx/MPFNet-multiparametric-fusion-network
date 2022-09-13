@@ -8,6 +8,6 @@ Description:
     参数信息
 """
 
-clinical_information_path = r'C:\Users\12828\Desktop\病人信息\汇总信息-2.xlsx'
+clinical_information_path = r'C:\Users\12828\Desktop\病人信息\汇总信息-4.xlsx'
 
 
