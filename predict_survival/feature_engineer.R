@@ -5,11 +5,12 @@
 
 # 下载安装包
 #install.packages('glmnet')
+rm(list=ls()) # 清空数据
 
 setwd("C:\\Users\\12828\\Desktop\\osteosarcoma\\os_survival")
 print(getwd())
 
-rm(list=ls()) # 清空数据e
+library(MASS)
 library(glmnet)
 library(car)
 library(rms)   ###加载rms包#
@@ -64,8 +65,8 @@ coef(train_fit_cv, s = "lambda.min")
 
 
 # 纯影像学训练集的效果判断
-train_pred <- data.matrix(predict(train_fit_cv, train_img_features))
-colnames(train_pred)[1] <- 'five_os_pred'
+train_pred <- data.matrix(sigmoid(predict(train_fit_cv, train_img_features)))
+colnames(train_pred)[1] <- 'imaging_score'
 # 训练集 ROC
 train_modelroc <- roc(train_label, sigmoid(train_pred))
 plot(train_modelroc, print.auc=TRUE, auc.polygon=TRUE)
@@ -74,7 +75,7 @@ plot(train_modelroc, print.auc=TRUE, auc.polygon=TRUE)
 
 # 纯影像学测试集的效果判断
 val_pred <- data.matrix(predict(train_fit_cv, val_img_features))
-colnames(val_pred)[1] <- 'five_os_pred'
+colnames(val_pred)[1] <- 'imaging_score'
 # 测试集 ROC
 val_modelroc <- roc(val_label,sigmoid(val_pred))
 plot(val_modelroc, print.auc=TRUE, auc.polygon=TRUE)
@@ -108,13 +109,16 @@ now_val_dataset$lung_metastases <- factor(now_val_dataset$lung_metastases,levels
 ddist <- datadist(now_train_dataset)
 options(datadist='ddist')
 
-f <- lrm(five_os~.,data=now_train_dataset, x=TRUE, y=TRUE)
+f <- lrm(five_os~imaging_score+sex+lung_metastases,data=now_train_dataset, x=TRUE, y=TRUE,maxit=1000)
 summary(f)   # 也能用此函数看具体模型情况，模型的系数，置信区间等
 print(f)
 
+vif(f)
+f2 <-step(f)
+
 #绘制nomogram
 nomogram <- nomogram(f,fun=function(x)1/(1+exp(-x)), ##逻辑回归计算公式
-                     fun.at = c(0.01,0.1,0.5,0.8,0.99),#风险轴刻度
+                     fun.at = c(0.1,0.6,0.99),#风险轴刻度
                      funlabel = "Prob of survival", #风险轴便签
                      lp=F,  ##是否显示系数轴
                      conf.int = F, ##每个得分的置信度区间，用横线表示,横线越长置信度越
@@ -124,12 +128,42 @@ plot(nomogram)
 
 
 ##训练集中的ROC
-pred_f_training<-predict(f,training_dataset)
+pred_f_training<-predict(f,now_train_dataset)
 modelroc <- roc(now_train_dataset$five_os,pred_f_training)
 plot(modelroc, print.auc=TRUE, auc.polygon=TRUE, grid=c(0.1, 0.2), print.thres=TRUE)
 
+# 验证集中的ROC
+pred_f_validation<-predict(f,now_val_dataset)
+modelroc <- roc(now_val_dataset$five_os,pred_f_validation)
+plot(modelroc, print.auc=TRUE, auc.polygon=TRUE, grid=c(0.1, 0.2),
+     print.thres=TRUE)
+
+# 训练集的校准曲线 CalibrateCurve
+cal <- calibrate(f)
+plot(cal)
+
+# 测试集的校准曲线
+fit.vad<-lrm(now_val_dataset$five_os~pred_f_validation,data=now_val_dataset, x=TRUE, y=TRUE)
+cal <- calibrate(fit.vad)
+plot(cal)
+
+##训练集决策曲线DCA
+DCA_training<- decision_curve(five_os ~ imaging_score+age+sex+lung_metastases
+                              ,data = now_train_dataset
+                              #,policy = "opt-in"
+                              ,study.design = 'cohort')
+plot_decision_curve(DCA_training,curve.names= c('Nomogram model'))
+
+#验证集决策曲线DCA
+DCA_training<- decision_curve(five_os ~ imaging_score+age+sex+lung_metastases
+                              ,data = now_val_dataset
+                              #,policy = "opt-in"
+                              ,study.design = 'cohort')
+plot_decision_curve(DCA_training,curve.names= c('Nomogram model'))
+
+
 ####      随机森林     ######
-gx.rf<-randomForest(five_os~.,data=now_train_dataset,importance=TRUE, ntree=1000)
+gx.rf<-randomForest(five_os~imaging_score+sex+age+volume+lung_metastases,data=now_train_dataset,importance=TRUE, ntree=1000)
 print(gx.rf)
 importance(gx.rf)
 varImpPlot(gx.rf)

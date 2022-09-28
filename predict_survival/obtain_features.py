@@ -33,8 +33,8 @@ def reconstruct_mask(roi_path, is_T1=True):
     u = np.unique(mask)
     print(u)
     if is_T1:
-        mask[mask != 0] = 1  # 坏死区域可看做肿瘤区域
-        # mask[mask > 1] = 0
+        # mask[mask != 0] = 1  # 坏死区域可看做肿瘤区域
+        mask[mask > 1] = 0
     else:
         mask[mask > 1] = 0  # 水肿区域不可看做肿瘤区域
 
@@ -111,10 +111,11 @@ def obtain_features(dataset_path, patients_clinical, store_excel_path=r'./featur
                 features = get_feature(img, roi, is_T1=is_T1)
                 features.setdefault('name', patient)
                 features.setdefault('time', mri_time)
-                features.setdefault('volume', float(features['original_shape_Maximum2DDiameterColumn']*
-                                                    features['original_shape_Maximum2DDiameterRow']*
+
+                features.setdefault('volume', float(features['original_shape_Maximum2DDiameterColumn'] *
+                                                    features['original_shape_Maximum2DDiameterRow'] *
                                                     features['original_shape_Maximum2DDiameterSlice'])
-                                    /6000*3.1415926)
+                                    / 10000)
 
                 for k, v in clinical_informatin.items():
                     features.setdefault(k, v)

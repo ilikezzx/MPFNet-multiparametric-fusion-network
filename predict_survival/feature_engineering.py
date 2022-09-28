@@ -24,6 +24,7 @@ import SimpleITK as sitk
 from radiomics import featureextractor
 from load_dataset import loading_dataset
 from load_clinical import loading_clinical_data
+from loading_clinical_cox import loading_clinical_coxdata
 from features_selectiono import lasso_prediction
 from data_processing import processing
 from obtain_features import obtain_features
@@ -39,7 +40,7 @@ def get_args():
     parser.add_argument('--father-path', '-fp', type=str, default=r'C:\Users\12828\Desktop\osteosarcoma\os_survival')
     parser.add_argument('--input-path', '-ip', type=str, default=r'C:\Users\12828\Desktop\osteosarcoma\bone tumor data',
                         help='datasets path')
-    parser.add_argument('--store-path', '-sp', type=str, default=r'./features_dataset_add(2022.09.09).csv',
+    parser.add_argument('--store-path', '-sp', type=str, default=r'features_dataset_full_cox(2022.09.22).csv',
                         help='the path of output excel')
     parser.add_argument('--retain-features-txt-path', '-rftp', type=str, default=r'retain_features_set.txt',
                         help='retain features array')
@@ -50,9 +51,9 @@ def get_args():
 if __name__ == '__main__':
     args = get_args()
     # 读取临床因素
-    # patients_clinical = loading_clinical_data()
-
-    # 通过Pyradiomics库获取特征
+    # patients_clinical = loading_clinical_coxdata()
+    #
+    # # 通过Pyradiomics库获取特征
     # obtain_features(args.input_path, patients_clinical, os.path.join(args.father_path, args.store_path))
 
     # 划分数据集
@@ -69,8 +70,8 @@ if __name__ == '__main__':
     # 直接保存增强后的数据
     trainset_result = pd.concat([train_image_features, train_clinical_features, train_results], axis=1)
     testset_result = pd.concat([test_image_features, test_clinical_features, test_results], axis=1)
-    trainset_result.to_csv(os.path.join(args.father_path, 'rawtrainset.csv'), index=False)
-    testset_result.to_csv(os.path.join(args.father_path, 'rawtestset.csv'), index=False)
+    trainset_result.to_csv(os.path.join(args.father_path, 'cox_trainset(2022.09.22).csv'), index=False)
+    testset_result.to_csv(os.path.join(args.father_path, 'cox_testset(2022.09.22).csv'), index=False)
 
 
     # # 利用Lasso进行特征选择

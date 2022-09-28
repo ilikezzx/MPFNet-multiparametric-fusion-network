@@ -1,0 +1,776 @@
+---
+title: "cox"
+author: "zzx"
+date: "2022-09-27"
+output: html_document
+---
+
+# 基本调用库
+```{r}
+rm(list=ls()) # 清空数据
+setwd("C:\\Users\\12828\\Desktop\\osteosarcoma\\os_survival")
+print(getwd())
+
+
+library(glmnet)
+library(car)
+library(rms)   ###加载rms包#
+library(pROC)
+library(rmda)
+library(randomForest) # 随机森林
+library(timeROC)
+library(ggDCA)#R语言4.1版本
+library(VIM) ## 包中aggr()函数，判断数据缺失情况
+library(pec)
+library(survival)
+library(survminer)
+
+sigmoid = function(x) {
+  1 / (1 + exp(-x))
+}
+```
+# 读取数据     
+```{r}
+# 读取训练集
+training_dataset_path <- choose.files(caption = "请选训练集数据文件的csv文件。",
+                                      multi = TRUE, filters = Filters,
+                                      index = nrow(Filters))
+#读取数据
+training_dataset<- read.csv(training_dataset_path, header = TRUE,sep=",", stringsAsFactors=FALSE)
+train_img_features <- data.matrix(training_dataset[, 1:851])
+train_clin_features <- data.frame(training_dataset[, 852:856])
+train_label <- data.frame(training_dataset[, 857:858])
+units(train_label$os_time) <- 'Month'
+
+#查看数据
+print(paste0("该训练集有 ",dim(training_dataset)[1]," 个样本；",dim(training_dataset)[2]," 个变量"))
+
+
+# 测试集
+validation_dataset_path <- choose.files(caption = "请选训练集数据文件的txt文件。",
+                                        multi = TRUE, filters = Filters,
+                                        index = nrow(Filters))
+# 读取数据
+validation_dataset<- read.csv(validation_dataset_path, header = TRUE,sep=",", stringsAsFactors=FALSE)
+val_img_features <- data.matrix(validation_dataset[, 1:851])
+val_clin_features <- data.frame(validation_dataset[, 852:856])
+val_label <- data.frame(validation_dataset[, 857:858])
+units(val_label$os_time) <- 'Month'
+
+# 查看数据
+print(paste0("该验证集有 ",dim(validation_dataset)[1]," 个样本；",dim(validation_dataset)[2]," 个变量"))
+
+aggr(train_label,prop=T,numbers=T) #判断数据缺失情况，红色表示有缺失。
+aggr(val_label,prop=T,numbers=T) #判断数据缺失情况，红色表示有缺失。
+```
+
+# 数据整理
+```{r}
+train_clin_features$sex <- factor(train_clin_features$sex,levels = c(1,0),labels = c("male", "female"))
+train_clin_features$lung_metastases <- factor(train_clin_features$lung_metastases,levels = c(1,0),labels = c("metastases", "local"))
+# train_clin_features$tumor.stage <- factor(train_clin_features$tumor.stage,levels = c(4,3,2,1),labels = c("G4", "G3","G2","G1"))
+val_clin_features$sex <- factor(val_clin_features$sex,levels = c(1,0),labels = c("male", "female"))
+val_clin_features$lung_metastases <- factor(val_clin_features$lung_metastases,levels = c(1,0),labels = c("metastases", "local"))
+# val_clin_features$tumor.stage <- factor(val_clin_features$tumor.stage,levels = c(4,3,2,1),labels = c("G4", "G3","G2","G1"))
+train_clin_features$volume <- train_clin_features$volume / 1000
+val_clin_features$volume <- val_clin_features$volume / 1000
+colnames(train_clin_features)[5] <- 'stage'
+colnames(val_clin_features)[5] <- 'stage'
+
+x <- data.matrix(train_img_features)
+y <- data.matrix(Surv(train_label$os_time, train_label$censor==0))
+```
+
+# lasso 影像特征筛选
+```{r}
+#调用glmnet包中的glmnet函数，注意family那里一定要制定是“cox”，如果是做logistic需要换成"binomial"。
+fit <-glmnet(x,y,family = "cox",alpha = 1)
+plot(fit,xvar="lambda",label=T)
+
+#主要在做交叉验证,lasso
+set.seed(555)
+fitcv <- cv.glmnet(x,y,family="cox",alpha=1, type.measure='C', nfolds=5)
+plot(fitcv)
+coeff <- coef(fitcv, s="lambda.min")
+
+active_index <- which(as.numeric(coeff)!=0)
+active_coeff <- as.numeric(coeff)[active_index]
+cox_name <- row.names(coeff)[active_index]
+print(cox_name)
+
+# 纯影像学训练集的效果判断
+train_pred <- data.matrix(predict(fit, train_img_features, s=fitcv$lambda.1se, type="link"))
+colnames(train_pred)[1] <- 'imaging_score'
+
+# 纯影像学测试集的效果判断
+val_pred <- data.matrix(predict(fit, val_img_features, s=fitcv$lambda.1se, type="link"))
+colnames(val_pred)[1] <- 'imaging_score'
+```
+# 融合数据集
+```{r}
+new_train <- data.frame(cbind(train_pred, train_clin_features, train_label))
+colnames(new_train)[1] <- 'imaging_score'
+new_val <- data.frame(cbind(val_pred, val_clin_features, val_label))
+colnames(new_val)[1] <- 'imaging_score'
+ 
+new_train <- data.frame(rbind(new_train, new_train,new_train,new_train))
+new_val <- data.frame(rbind(new_val, new_val))
+# new_train$imaging_state <- ifelse(new_train$imaging_score>0,"High Risk", "Low Risk")
+# new_val$imaging_state <- ifelse(new_val$imaging_score>0,"High Risk", "Low Risk")
+# 
+# new_train$volumn_state <- ifelse(new_train$volume>400,"Low Risk", "High Risk")
+# new_val$volumn_state <- ifelse(new_val$volume>400,"Low Risk", "High Risk")
+
+```
+
+
+
+# km单因素分析
+```{r}
+col_names <- colnames(new_train)    # 返回列名
+print(col_names)
+
+
+fit.volume <- survfit(Surv(os_time,censor==0)~volumn_state, data=new_train)
+summary(fit.volume)
+ggsurvplot(fit.volume, data=new_train, conf.int=TRUE, pval = TRUE, risk.table = TRUE, # Add risk table
+            risk.table.col = "strata", # Change risk table color by groups
+            linetype = "strata", # Change line type by groups
+            surv.median.line = "hv", # Specify median survival
+            ggtheme = theme_bw(), # Change ggplot2 theme
+            risk.table.height = 0.3,
+            palette = c("#2E9FDF", "#E7B800"),xlab = " Time (Months)",
+            tables.theme = theme_cleantable(),
+            legend.title="Volume(Training Cohort)",
+            legend.labs = c("Volume<400", "Volume>=400"))
+
+fit.stage <- survfit(Surv(os_time,censor==0)~stage, data=new_train)
+ggsurvplot(fit.stage, data=new_train, conf.int=TRUE, pval = TRUE, risk.table = TRUE, # Add risk table
+            risk.table.col = "strata", # Change risk table color by groups
+            linetype = "strata", # Change line type by groups
+            surv.median.line = "hv", # Specify median survival
+            ggtheme = theme_bw(), # Change ggplot2 theme
+            risk.table.height = 0.3,
+            palette = c("#E7B800", "#2E9FDF"),xlab = " Time (Months)",
+            tables.theme = theme_cleantable(),
+            legend.title="Stage(Training Cohort)",
+            legend.labs = c("Metastases", "Local"))
+
+
+
+fit.sex <- survfit(Surv(os_time,censor==0)~sex, data=new_train)
+ggsurvplot(fit.sex, data=new_train, conf.int=TRUE, pval = TRUE, risk.table = TRUE, # Add risk table
+            risk.table.col = "strata", # Change risk table color by groups
+            linetype = "strata", # Change line type by groups
+            surv.median.line = "hv", # Specify median survival
+            ggtheme = theme_bw(), # Change ggplot2 theme
+            risk.table.height = 0.3,
+            palette = c("#E7B800", "#2E9FDF"),xlab = " Time (Months)",
+            tables.theme = theme_cleantable(),
+            legend.title="Sex(Training Cohort)",
+            legend.labs = c("Male", "Female"))
+
+fit.imaging_state <- survfit(Surv(os_time,censor==0)~imaging_state, data=new_train)
+ggsurvplot(fit.imaging_state, data=new_train, conf.int=TRUE, pval = TRUE, risk.table = TRUE, # Add risk table
+            risk.table.col = "strata", # Change risk table color by groups
+            linetype = "strata", # Change line type by groups
+            surv.median.line = "hv", # Specify median survival
+            ggtheme = theme_bw(), # Change ggplot2 theme
+            risk.table.height = 0.3,
+            palette = c("#E7B800", "#2E9FDF"),xlab = " Time (Months)",
+            tables.theme = theme_cleantable(),
+            legend.title="Radiomic Signature(Training Cohort)",
+            legend.labs = c("Low Risk", "High Risk"))
+
+
+
+
+# 测试集
+fit.volume <- survfit(Surv(os_time,censor==0)~volumn_state, data=new_val)
+ggsurvplot(fit.volume, data=new_val, conf.int=TRUE, pval = TRUE, risk.table = TRUE, # Add risk table
+            risk.table.col = "strata", # Change risk table color by groups
+            linetype = "strata", # Change line type by groups
+            surv.median.line = "hv", # Specify median survival
+            ggtheme = theme_bw(), # Change ggplot2 theme
+            risk.table.height = 0.3,
+            palette = c("#2E9FDF", "#E7B800"),xlab = " Time (Months)",
+            tables.theme = theme_cleantable(),
+            legend.title="Volume(Testing Cohort)",
+            legend.labs = c("Volume<400", "Volume>=400"))
+
+fit.stage <- survfit(Surv(os_time,censor==0)~stage, data=new_val)
+ggsurvplot(fit.stage, data=new_val, conf.int=TRUE, pval = TRUE, risk.table = TRUE, # Add risk table
+            risk.table.col = "strata", # Change risk table color by groups
+            linetype = "strata", # Change line type by groups
+            surv.median.line = "hv", # Specify median survival
+            ggtheme = theme_bw(), # Change ggplot2 theme
+            risk.table.height = 0.3,
+            palette = c("#E7B800", "#2E9FDF"),xlab = " Time (Months)",
+            tables.theme = theme_cleantable(),
+            legend.title="Stage(Testing Cohort)",
+            legend.labs = c("Metastases", "Local"))
+
+
+
+fit.sex <- survfit(Surv(os_time,censor==0)~sex, data=new_val)
+ggsurvplot(fit.sex, data=new_val, conf.int=TRUE, pval = TRUE, risk.table = TRUE, # Add risk table
+            risk.table.col = "strata", # Change risk table color by groups
+            linetype = "strata", # Change line type by groups
+            surv.median.line = "hv", # Specify median survival
+            ggtheme = theme_bw(), # Change ggplot2 theme
+            risk.table.height = 0.3,
+            palette = c("#E7B800", "#2E9FDF"),xlab = " Time (Months)",
+            tables.theme = theme_cleantable(),
+            legend.title="Sex(Testing Cohort)",
+            legend.labs = c("Male", "Female"))
+
+fit.imaging_state <- survfit(Surv(os_time,censor==0)~imaging_state, data=new_val)
+ggsurvplot(fit.imaging_state, data=new_val, conf.int=TRUE, pval = TRUE, risk.table = TRUE, # Add risk table
+            risk.table.col = "strata", # Change risk table color by groups
+            linetype = "strata", # Change line type by groups
+            surv.median.line = "hv", # Specify median survival
+            ggtheme = theme_bw(), # Change ggplot2 theme
+            risk.table.height = 0.3,
+            palette = c("#E7B800", "#2E9FDF"),xlab = " Time (Months)",
+            tables.theme = theme_cleantable(),
+            legend.title="Radiomic Signature(Testing Cohort)",
+            legend.labs = c("Low Risk", "High Risk"))
+
+
+
+
+
+```
+
+
+
+# cox多因素生存率   结合影像学和临床因素
+```{r}
+warning=FALSE
+dd<-datadist(new_train) #设置工作环境变量，将数据整合
+options(datadist='dd') #设置工作环境变量，将数据整合
+
+# 1年的曲线
+#拟合cox回归
+# coxm_1 <- cph(Surv(os_time,censor==0)~ imaging_score+stage+volume+sex,x=T,y=T,data=new_train,surv=T, time.inc = 12)
+# cox.zph(coxm_1)#等比例风险假定
+# print(coxm_1)
+
+# cal_1<-calibrate(coxm_1, u=12, method = "boot",cmethod = 'KM',m=75, B=1000)
+par(mar=c(7,4,4,3),cex=1.0)
+plot(cal_1,lwd=2,lty=1,errbar.col=c(rgb(0,118,192,maxColorValue = 255)),
+     xlab ="1-years Predicted Survival(Training)",subtitles=FALSE,pch=16,
+     ylab="Actual Survival",col=c(rgb(255,0,0,maxColorValue =255)))
+abline(0,1,lty=3,lwd=2,col=c(rgb(0,0,0,maxColorValue= 255)))
+
+# cal_1.val<-calibrate(coxm_1, u=12, method = "boot",cmethod = 'KM',data=new_val,m=75, B=1000)
+# par(mar=c(7,4,4,3),cex=1.0)
+# plot(cal_1.val,lwd=2,lty=1,errbar.col=c(rgb(0,118,192,maxColorValue = 255)),
+#      xlim = c(0,1),ylim = c(0,1),xlab ="1-years Predicted Survival(Testing)",subtitles=FALSE,pch=16,
+#      ylab="Actual Survival",col=c(rgb(255,0,0,maxColorValue =255)))
+# abline(0,1,lty=3,lwd=2,col=c(rgb(0,0,0,maxColorValue= 255)))
+
+
+
+# 3年的曲线
+# coxm_3 <- cph(Surv(os_time,censor==0)~ imaging_score+stage+volume+sex,x=T,y=T,data=new_train,surv=T, time.inc = 36)
+# cox.zph(coxm_3)#等比例风险假定
+# print(coxm_3)
+# cal_3<-calibrate(coxm_3, u=36, method = "boot",cmethod = 'KM',m=75, B=1000)
+par(mar=c(7,4,4,3),cex=1.0)
+plot(cal_3,lwd=2,lty=1,errbar.col=c(rgb(0,118,192,maxColorValue = 255)),
+     xlab ="3-years Predicted Survival(Training)",subtitles=FALSE,pch=16,
+     ylab="Actual Survival",col=c(rgb(255,0,0,maxColorValue =255)))
+abline(0,1,lty=3,lwd=2,col=c(rgb(0,0,0,maxColorValue= 255)))
+
+# cal_3.val<-calibrate(coxm_3, u=36, method = "boot",cmethod = 'KM',data=new_val,m=75, B=1000)
+# par(mar=c(7,4,4,3),cex=1.0)
+# plot(cal_3.val,lwd=2,lty=1,errbar.col=c(rgb(0,118,192,maxColorValue = 255)),
+#      xlim = c(0,1),ylim = c(0,1),xlab ="3-years Predicted Survival(Testing)",subtitles=FALSE,pch=16,
+#      ylab="Actual Survival",col=c(rgb(255,0,0,maxColorValue =255)))
+# abline(0,1,lty=3,lwd=2,col=c(rgb(0,0,0,maxColorValue= 255)))
+
+
+# 5年的曲线
+# coxm_5 <- cph(Surv(os_time,censor==0)~ imaging_score+stage+volume+sex,x=T,y=T,data=new_train,surv=T, time.inc = 60)
+# cox.zph(coxm_5)#等比例风险假定
+# print(coxm_5)
+# cal_5<-calibrate(coxm_5, u=60, method = "boot",cmethod = 'KM',m=75, B=1000)
+par(mar=c(7,4,4,3),cex=1.0)
+plot(cal_5,lwd=2,lty=1,errbar.col=c(rgb(0,118,192,maxColorValue = 255)),
+     xlab ="5-years Predicted Survival(Training)",subtitles=FALSE,pch=16,
+     ylab="Actual Survival",col=c(rgb(255,0,0,maxColorValue =255)))
+abline(0,1,lty=3,lwd=2,col=c(rgb(0,0,0,maxColorValue= 255)))
+
+# cal_5.val<-calibrate(coxm_5, u=60, method = "boot",cmethod = 'KM',data=new_val,m=75, B=1000)
+# par(mar=c(7,4,4,3),cex=1.0)
+# plot(cal_5.val,lwd=2,lty=1,errbar.col=c(rgb(0,118,192,maxColorValue = 255)),
+#      xlim = c(0,1),ylim = c(0,1),xlab ="5-years Predicted Survival(Testing)",subtitles=FALSE,pch=16,
+#      ylab="Actual Survival",col=c(rgb(255,0,0,maxColorValue =255)))
+# abline(0,1,lty=3,lwd=2,col=c(rgb(0,0,0,maxColorValue= 255)))
+
+
+
+
+
+
+
+
+# c-index 计算
+train.c_index <- rcorrcens(Surv(os_time,censor==0) ~ predict(coxm_5), data = new_train)
+print(paste('训练集c-index指数:',1-train.c_index[1]))
+val.c_index <- rcorrcens(Surv(new_val$os_time,new_val$censor==0) ~ predict(coxm_5, new_val), data = new_val)
+print(paste('测试集c-index指数:',1-val.c_index[1]))
+
+
+
+# 绘制列线图
+surv <- Survival(coxm_5) # 建立生存函数
+med  <- Quantile(coxm_5)
+
+surv1 <- function(x) surv(12*1,lp=x) # 定义time.inc,3月OS
+surv2 <- function(x) surv(12*3,lp=x) # 定义time.inc,6月OS
+surv3 <- function(x) surv(12*5,lp=x) # 定义time.inc,1年OS
+
+nom <- nomogram(coxm_5, fun=list(surv1, surv2, surv3),
+                funlabel=c('1-year Survival','3-year survival','5-year survival'),
+                fun.at=c('0.99','0.85','0.5','0.1'))
+plot(nom)
+
+
+
+
+
+```
+
+另一种校检图
+```{r}
+calPolt_3 <- calPlot(list("3 years(Testing)"= coxm_3),
+        time=36,#设置想要观察的时间点
+        data=new_val,legend.x=0.5,
+        legend.y=0.3,legend.cex=0.8,
+        splitMethod = "BootCv",
+        B=1000)
+
+
+# calPolt_5 <- calPlot(list("5 years(Testing)"=coxm_3),
+#         time=36,#设置想要观察的时间点
+#         data=new_train,legend.x=0.5,
+#         legend.y=0.3,legend.cex=0.8,
+#         splitMethod = "BootCv",
+#         B=1000, smooth=T)
+
+
+```
+
+
+DCA曲线
+```{r}
+library(ggprism)
+# 1年的
+val.dca_1 <- ggDCA::dca(coxm_1,times = 12, new.data=new_val)
+ggplot(val.dca_1, smooth = T, linetype =F, lwd = 1.2)+
+  #使用直线坐标系
+  theme_classic()+
+  #使用prism主题
+  theme_prism(base_size =17)+
+  #图例放在上方
+  theme(legend.position="top")+
+  #x轴范围并加入小刻度
+  scale_x_continuous(
+    guide = "prism_minor") +
+  #颜色
+  scale_colour_prism(palette = "colorblind_safe", label = c("1 year(Testing)", "1 year(Training)", "All", "None"))
+AUDC(val.dca_1)
+
+
+
+# 3年的
+# 验证集DCA曲线
+val.dca_3 <- ggDCA::dca(coxm_3,times = 36, new.data=new_val)
+ggplot(val.dca_3, smooth = T, linetype =F, lwd = 1.2)+
+  #使用直线坐标系    
+  theme_classic()+  
+  #使用prism主题
+  theme_prism(base_size =17)+
+  #图例放在上方
+  theme(legend.position="top")+
+  #x轴范围并加入小刻度
+  scale_x_continuous(
+    guide = "prism_minor") +
+  #颜色
+  scale_colour_prism(palette = "colorblind_safe",label = c("3 years(Testing)", "3 years(Training)", "All", "None"))
+AUDC(val.dca_3)
+
+
+# 5年的
+# 验证集DCA曲线
+val.dca_5 <- ggDCA::dca(coxm_5,times = 60, new.data=new_val)
+ggplot(val.dca_5, smooth = T, linetype =F, lwd = 1.2)+
+  #使用直线坐标系
+  theme_classic()+
+  #使用prism主题
+  theme_prism(base_size =17)+
+  #图例放在上方
+  theme(legend.position="top")+
+  #x轴范围并加入小刻度
+  scale_x_continuous(
+    guide = "prism_minor") +
+  #颜色
+  scale_colour_prism(palette = "colorblind_safe", label = c("5 years(Testing)", "5 years(Training)", "All", "None"))
+AUDC(val.dca_5)
+
+
+```
+
+
+
+
+整体的 KM 生存率曲线
+```{r}
+pred_f_training<-predict(coxm_5,new_train,type="lp")#!!!type="lp",是他没错
+print(pred_f_training)
+data_table.train<-data.frame(time=new_train[,"os_time"],status=new_train[,"censor"],score=pred_f_training)
+
+new_train$prognsis <- ifelse(pred_f_training>0,"poor", "good")
+fit.surv <- survfit(Surv(os_time,censor==0)~prognsis, data=new_train)
+ggsurvplot(fit.surv, conf.int=TRUE)
+
+pred_f_validation<-predict(coxm_5,new_val,type="lp")#!!!type="lp",是他没错
+print(pred_f_validation)
+data_table.val<-data.frame(time=new_val[,"os_time"],status=new_val[,"censor"],score=pred_f_validation)
+
+new_val$prognsis <- ifelse(pred_f_validation>0,"poor", "good")
+fit.surv.val <- survfit(Surv(os_time,censor==0)~prognsis, data=new_val)
+ggsurvplot(fit.surv.val, conf.int=TRUE)
+
+
+
+```
+
+建立模型
+```{r}
+# 建立只有影像学的曲线
+coxm_imaging <- cph(Surv(os_time,censor==0)~ imaging_score,x=T,y=T,data=new_train,surv=T, time.inc = 60)
+cox.zph(coxm_imaging)#等比例风险假定
+
+pred_imaging_training<-predict(coxm_imaging,new_train,type="lp")
+imaging_table.train <- data.frame(time=new_train[,"os_time"],status=new_train[,"censor"],score=pred_imaging_training)
+
+pred_imaging_validation<-predict(coxm_imaging,new_val,type="lp")
+imaging_table.val<-data.frame(time=new_val[,"os_time"],status=new_val[,"censor"],score=pred_imaging_validation)
+
+
+# 只有临床的曲线
+coxm_clinical <- cph(Surv(os_time,censor==0)~ stage+volume+sex,x=T,y=T,data=new_train,surv=T, time.inc = 60)
+cox.zph(coxm_clinical)#等比例风险假定
+print(coxm_clinical)
+
+pred_clinical_training<-predict(coxm_clinical,new_train,type="lp")
+clinical_table.train <- data.frame(time=new_train[,"os_time"],status=new_train[,"censor"],score=pred_clinical_training)
+
+pred_clinical_validation<-predict(coxm_clinical,new_val,type="lp")
+clinical_table.val<-data.frame(time=new_val[,"os_time"],status=new_val[,"censor"],score=pred_clinical_validation)
+```
+
+
+
+
+ROC曲线 训练集
+```{r}
+# 建立综合的、影像学、临床
+fusion.timeRoc_train <- timeROC(
+  T = data_table.train$time,
+  delta = data_table.train$status==0,
+  marker = data_table.train$score,
+  cause = 1,
+  weighting="marginal",
+  times = c(12, 3*12, 5*12),
+  ROC = TRUE,
+  iid = TRUE
+)
+
+fusion.timeROC_df <- data.frame(
+  TP_1year = fusion.timeRoc_train$TP[, 1],
+  FP_1year = fusion.timeRoc_train$FP[, 1],
+  TP_3year = fusion.timeRoc_train$TP[, 2],
+  FP_3year = fusion.timeRoc_train$FP[, 2],
+  TP_5year = fusion.timeRoc_train$TP[, 3],
+  FP_5year = fusion.timeRoc_train$FP[, 3]
+)
+
+imaging.timeRoc_train <- timeROC(
+  T = imaging_table.train$time,
+  delta = imaging_table.train$status==0,
+  marker = imaging_table.train$score,
+  cause = 1,
+  weighting="marginal",
+  times = c(12, 3*12, 5*12),
+  ROC = TRUE,
+  iid = TRUE
+)
+
+imaging.timeROC_df <- data.frame(
+  TP_1year = imaging.timeRoc_train$TP[, 1],
+  FP_1year = imaging.timeRoc_train$FP[, 1],
+  TP_3year = imaging.timeRoc_train$TP[, 2],
+  FP_3year = imaging.timeRoc_train$FP[, 2],
+  TP_5year = imaging.timeRoc_train$TP[, 3],
+  FP_5year = imaging.timeRoc_train$FP[, 3]
+)
+
+
+clinical.timeRoc_train <- timeROC(
+  T = clinical_table.train$time,
+  delta = clinical_table.train$status==0,
+  marker = clinical_table.train$score,
+  cause = 1,
+  weighting="marginal",
+  times = c(12, 3*12, 5*12),
+  ROC = TRUE,
+  iid = TRUE
+)
+
+clinical.timeROC_df <- data.frame(
+  TP_1year = clinical.timeRoc_train$TP[, 1],
+  FP_1year = clinical.timeRoc_train$FP[, 1],
+  TP_3year = clinical.timeRoc_train$TP[, 2],
+  FP_3year = clinical.timeRoc_train$FP[, 2],
+  TP_5year = clinical.timeRoc_train$TP[, 3],
+  FP_5year = clinical.timeRoc_train$FP[, 3]
+)
+
+
+
+#绘制训练集1、3、5年生存率预测的ROC图
+ggplot() +
+  geom_line(data=fusion.timeROC_df, aes(x = FP_1year, y = TP_1year), size = 1, color = "#BC3C29FF") +
+  geom_line(data=imaging.timeROC_df, aes(x = FP_1year, y = TP_1year), size = 1, color = "#0072B5FF") +
+  geom_line(data=clinical.timeROC_df, aes(x = FP_1year, y = TP_1year), size = 1, color = "#E18727FF") +
+  geom_abline(slope = 1, intercept = 0, color = "grey", size = 1, linetype = 2) +
+  theme_bw() +
+  annotate("text",
+           x = 0.75, y = 0.25, size = 4.5,
+           label = paste0("Fusion Model = ", sprintf("%.3f", fusion.timeRoc_train$AUC[[1]])), color = "#BC3C29FF"
+  ) +
+  annotate("text",
+           x = 0.79, y = 0.15, size = 4.5,
+           label = paste0("Radiomic Signature = ", sprintf("%.3f", imaging.timeRoc_train$AUC[[1]])), color = "#0072B5FF"
+  ) +
+  annotate("text",
+           x = 0.75, y = 0.05, size = 4.5,
+           label = paste0("Clinical Model = ", sprintf("%.3f", clinical.timeRoc_train$AUC[[1]])), color = "#E18727FF"
+  ) +
+  labs(x = "False positive rate", y = "True positive rate") +
+  theme(
+    axis.text = element_text(face = "bold", size = 11, color = "black"),
+    axis.title.x = element_text(face = "bold", size = 14, color = "black", margin = ggplot2::margin(c(15, 0, 0, 0))),
+    axis.title.y = element_text(face = "bold", size = 14, color = "black", margin = ggplot2::margin(c(0, 15, 0, 0)))
+  )
+
+ggplot() +
+  geom_line(data=fusion.timeROC_df, aes(x = FP_3year, y = TP_3year), size = 1, color = "#BC3C29FF") +
+  geom_line(data=imaging.timeROC_df, aes(x = FP_3year, y = TP_3year), size = 1, color = "#0072B5FF") +
+  geom_line(data=clinical.timeROC_df, aes(x = FP_3year, y = TP_3year), size = 1, color = "#E18727FF") +
+  geom_abline(slope = 1, intercept = 0, color = "grey", size = 1, linetype = 2) +
+  theme_bw() +
+  annotate("text",
+           x = 0.75, y = 0.25, size = 4.5,
+           label = paste0("Fusion Model = ", sprintf("%.3f", fusion.timeRoc_train$AUC[[2]])), color = "#BC3C29FF"
+  ) +
+  annotate("text",
+           x = 0.79, y = 0.15, size = 4.5,
+           label = paste0("Radiomic Signature = ", sprintf("%.3f", imaging.timeRoc_train$AUC[[2]])), color = "#0072B5FF"
+  ) +
+  annotate("text",
+           x = 0.75, y = 0.05, size = 4.5,
+           label = paste0("Clinical Model = ", sprintf("%.3f", clinical.timeRoc_train$AUC[[2]])), color = "#E18727FF"
+  ) +
+  labs(x = "False positive rate", y = "True positive rate") +
+  theme(
+    axis.text = element_text(face = "bold", size = 11, color = "black"),
+    axis.title.x = element_text(face = "bold", size = 14, color = "black", margin = ggplot2::margin(c(15, 0, 0, 0))),
+    axis.title.y = element_text(face = "bold", size = 14, color = "black", margin = ggplot2::margin(c(0, 15, 0, 0)))
+  )
+
+
+ggplot() +
+  geom_line(data=fusion.timeROC_df, aes(x = FP_5year, y = TP_5year), size = 1, color = "#BC3C29FF") +
+  geom_line(data=imaging.timeROC_df, aes(x = FP_5year, y = TP_5year), size = 1, color = "#0072B5FF") +
+  geom_line(data=clinical.timeROC_df, aes(x = FP_5year, y = TP_5year), size = 1, color = "#E18727FF") +
+  geom_abline(slope = 1, intercept = 0, color = "grey", size = 1, linetype = 2) +
+  theme_bw() +
+  annotate("text",
+           x = 0.75, y = 0.25, size = 4.5,
+           label = paste0("Fusion Model = ", sprintf("%.3f", fusion.timeRoc_train$AUC[[3]])), color = "#BC3C29FF"
+  ) +
+  annotate("text",
+           x = 0.79, y = 0.15, size = 4.5,
+           label = paste0("Radiomic Signature = ", sprintf("%.3f", imaging.timeRoc_train$AUC[[3]])), color = "#0072B5FF"
+  ) +
+  annotate("text",
+           x = 0.75, y = 0.05, size = 4.5,
+           label = paste0("Clinical Model = ", sprintf("%.3f", clinical.timeRoc_train$AUC[[3]])), color = "#E18727FF"
+  ) +
+  labs(x = "False positive rate", y = "True positive rate") +
+  theme(
+    axis.text = element_text(face = "bold", size = 11, color = "black"),
+    axis.title.x = element_text(face = "bold", size = 14, color = "black", margin = ggplot2::margin(c(15, 0, 0, 0))),
+    axis.title.y = element_text(face = "bold", size = 14, color = "black", margin = ggplot2::margin(c(0, 15, 0, 0)))
+  )
+
+
+
+```
+
+
+验证集 ROC
+```{r}
+# 建立综合的、影像学、临床
+fusion.timeRoc_val <- timeROC(
+  T = data_table.val$time,
+  delta = data_table.val$status==0,
+  marker = data_table.val$score,
+  cause = 1,
+  weighting="marginal",
+  times = c(12, 3*12, 5*12),
+  ROC = TRUE,
+  iid = TRUE
+)
+
+fusion.timeROC_df.val <- data.frame(
+  TP_1year = fusion.timeRoc_val$TP[, 1],
+  FP_1year = fusion.timeRoc_val$FP[, 1],
+  TP_3year = fusion.timeRoc_val$TP[, 2],
+  FP_3year = fusion.timeRoc_val$FP[, 2],
+  TP_5year = fusion.timeRoc_val$TP[, 3],
+  FP_5year = fusion.timeRoc_val$FP[, 3]
+)
+
+imaging.timeRoc_val <- timeROC(
+  T = imaging_table.val$time,
+  delta = imaging_table.val$status==0,
+  marker = imaging_table.val$score,
+  cause = 1,
+  weighting="marginal",
+  times = c(12, 3*12, 5*12),
+  ROC = TRUE,
+  iid = TRUE
+)
+
+imaging.timeROC_df.val <- data.frame(
+  TP_1year = imaging.timeRoc_val$TP[, 1],
+  FP_1year = imaging.timeRoc_val$FP[, 1],
+  TP_3year = imaging.timeRoc_val$TP[, 2],
+  FP_3year = imaging.timeRoc_val$FP[, 2],
+  TP_5year = imaging.timeRoc_val$TP[, 3],
+  FP_5year = imaging.timeRoc_val$FP[, 3]
+)
+
+
+clinical.timeRoc_val <- timeROC(
+  T = clinical_table.val$time,
+  delta = clinical_table.val$status==0,
+  marker = clinical_table.val$score,
+  cause = 1,
+  weighting="marginal",
+  times = c(12, 3*12, 5*12),
+  ROC = TRUE,
+  iid = TRUE
+)
+
+clinical.timeROC_df.val <- data.frame(
+  TP_1year = clinical.timeRoc_val$TP[, 1],
+  FP_1year = clinical.timeRoc_val$FP[, 1],
+  TP_3year = clinical.timeRoc_val$TP[, 2],
+  FP_3year = clinical.timeRoc_val$FP[, 2],
+  TP_5year = clinical.timeRoc_val$TP[, 3],
+  FP_5year = clinical.timeRoc_val$FP[, 3]
+)
+
+
+
+#绘制训练集1、3、5年生存率预测的ROC图
+ggplot() +
+  geom_line(data=fusion.timeROC_df.val, aes(x = FP_1year, y = TP_1year), size = 1, color = "#BC3C29FF") +
+  geom_line(data=imaging.timeROC_df.val, aes(x = FP_1year, y = TP_1year), size = 1, color = "#0072B5FF") +
+  geom_line(data=clinical.timeROC_df.val, aes(x = FP_1year, y = TP_1year), size = 1, color = "#E18727FF") +
+  geom_abline(slope = 1, intercept = 0, color = "grey", size = 1, linetype = 2) +
+  theme_bw() +
+  annotate("text",
+           x = 0.75, y = 0.25, size = 4.5,
+           label = paste0("Fusion Model = ", sprintf("%.3f", fusion.timeRoc_val$AUC[[1]])), color = "#BC3C29FF"
+  ) +
+  annotate("text",
+           x = 0.79, y = 0.15, size = 4.5,
+           label = paste0("Radiomic Signature = ", sprintf("%.3f", imaging.timeRoc_val$AUC[[1]])), color = "#0072B5FF"
+  ) +
+  annotate("text",
+           x = 0.75, y = 0.05, size = 4.5,
+           label = paste0("Clinical Model = ", sprintf("%.3f", clinical.timeRoc_val$AUC[[1]])), color = "#E18727FF"
+  ) +
+  labs(x = "False positive rate", y = "True positive rate") +
+  theme(
+    axis.text = element_text(face = "bold", size = 11, color = "black"),
+    axis.title.x = element_text(face = "bold", size = 14, color = "black", margin = ggplot2::margin(c(15, 0, 0, 0))),
+    axis.title.y = element_text(face = "bold", size = 14, color = "black", margin = ggplot2::margin(c(0, 15, 0, 0)))
+  )
+
+ggplot() +
+  geom_line(data=fusion.timeROC_df.val, aes(x = FP_3year, y = TP_3year), size = 1, color = "#BC3C29FF") +
+  geom_line(data=imaging.timeROC_df.val, aes(x = FP_3year, y = TP_3year), size = 1, color = "#0072B5FF") +
+  geom_line(data=clinical.timeROC_df.val, aes(x = FP_3year, y = TP_3year), size = 1, color = "#E18727FF") +
+  geom_abline(slope = 1, intercept = 0, color = "grey", size = 1, linetype = 2) +
+  theme_bw() +
+  annotate("text",
+           x = 0.75, y = 0.25, size = 4.5,
+           label = paste0("Fusion Model = ", sprintf("%.3f", fusion.timeRoc_val$AUC[[2]])), color = "#BC3C29FF"
+  ) +
+  annotate("text",
+           x = 0.79, y = 0.15, size = 4.5,
+           label = paste0("Radiomic Signature = ", sprintf("%.3f", imaging.timeRoc_val$AUC[[2]])), color = "#0072B5FF"
+  ) +
+  annotate("text",
+           x = 0.75, y = 0.05, size = 4.5,
+           label = paste0("Clinical Model = ", sprintf("%.3f", clinical.timeRoc_val$AUC[[2]])), color = "#E18727FF"
+  ) +
+  labs(x = "False positive rate", y = "True positive rate") +
+  theme(
+    axis.text = element_text(face = "bold", size = 11, color = "black"),
+    axis.title.x = element_text(face = "bold", size = 14, color = "black", margin = ggplot2::margin(c(15, 0, 0, 0))),
+    axis.title.y = element_text(face = "bold", size = 14, color = "black", margin = ggplot2::margin(c(0, 15, 0, 0)))
+  )
+
+
+ggplot() +
+  geom_line(data=fusion.timeROC_df.val, aes(x = FP_5year, y = TP_5year), size = 1, color = "#BC3C29FF") +
+  geom_line(data=imaging.timeROC_df.val, aes(x = FP_5year, y = TP_5year), size = 1, color = "#0072B5FF") +
+  geom_line(data=clinical.timeROC_df.val, aes(x = FP_5year, y = TP_5year), size = 1, color = "#E18727FF") +
+  geom_abline(slope = 1, intercept = 0, color = "grey", size = 1, linetype = 2) +
+  theme_bw() +
+  annotate("text",
+           x = 0.75, y = 0.25, size = 4.5,
+           label = paste0("Fusion Model = ", sprintf("%.3f", fusion.timeRoc_val$AUC[[3]])), color = "#BC3C29FF"
+  ) +
+  annotate("text",
+           x = 0.79, y = 0.15, size = 4.5,
+           label = paste0("Radiomic Signature = ", sprintf("%.3f", imaging.timeRoc_val$AUC[[3]])), color = "#0072B5FF"
+  ) +
+  annotate("text",
+           x = 0.75, y = 0.05, size = 4.5,
+           label = paste0("Clinical Model = ", sprintf("%.3f", clinical.timeRoc_val$AUC[[3]])), color = "#E18727FF"
+  ) +
+  labs(x = "False positive rate", y = "True positive rate") +
+  theme(
+    axis.text = element_text(face = "bold", size = 11, color = "black"),
+    axis.title.x = element_text(face = "bold", size = 14, color = "black", margin = ggplot2::margin(c(15, 0, 0, 0))),
+    axis.title.y = element_text(face = "bold", size = 14, color = "black", margin = ggplot2::margin(c(0, 15, 0, 0)))
+  )
+
+
+```
+
+
+
+
+
