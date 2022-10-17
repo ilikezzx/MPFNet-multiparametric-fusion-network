@@ -25,7 +25,7 @@ def loading_dataset(dataset_path):
 
     # return image_features, clinical_features, results
 
-    train_df = data.sample(frac=0.75, random_state=666, axis=0)
+    train_df = data.sample(frac=0.75, random_state=66, axis=0)
     test_df = data[~data.index.isin(train_df.index)]
 
     train_df = train_df.reset_index(drop=True)

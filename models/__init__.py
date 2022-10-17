@@ -10,6 +10,7 @@ from .tbNet import MP_TBNet
 from .tbNet_Add import MP_TBNet_ADD
 from .attention_unet import AttU_Net
 from .model_3d import U_Net_3D
+from .unet_model import UNet
 
 
-__all__ = ['MP_TBNet', 'MP_TBNet_ADD', 'AttU_Net', 'U_Net_3D']
+__all__ = ['MP_TBNet', 'MP_TBNet_ADD', 'AttU_Net', 'U_Net_3D', 'UNet']

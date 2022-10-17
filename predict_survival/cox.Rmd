@@ -94,9 +94,18 @@ plot(fitcv)
 coeff <- coef(fitcv, s="lambda.min")
 
 active_index <- which(as.numeric(coeff)!=0)
+active_index
 active_coeff <- as.numeric(coeff)[active_index]
 cox_name <- row.names(coeff)[active_index]
 print(cox_name)
+
+
+radiomic_train <- train_img_features[, cox_name]
+radiomic_val <- val_img_features[, cox_name]
+
+# 写出数据
+# write.csv(x = radiomic_train,file = "radiomic_train_dataset.csv")
+# write.csv(x = radiomic_val,file = "radiomic_val_dataset.csv")
 
 # 纯影像学训练集的效果判断
 train_pred <- data.matrix(predict(fit, train_img_features, s=fitcv$lambda.1se, type="link"))
@@ -252,11 +261,11 @@ options(datadist='dd') #设置工作环境变量，将数据整合
 
 # 1年的曲线
 #拟合cox回归
-# coxm_1 <- cph(Surv(os_time,censor==0)~ imaging_score+stage+volume+sex,x=T,y=T,data=new_train,surv=T, time.inc = 12)
-# cox.zph(coxm_1)#等比例风险假定
-# print(coxm_1)
+coxm_1 <- cph(Surv(os_time,censor==0)~ imaging_score+stage+volume+sex,x=T,y=T,data=new_train,surv=T, time.inc = 12)
+cox.zph(coxm_1)#等比例风险假定
+print(coxm_1)
 
-# cal_1<-calibrate(coxm_1, u=12, method = "boot",cmethod = 'KM',m=75, B=1000)
+cal_1<-calibrate(coxm_1, u=12, method = "boot",cmethod = 'KM',m=75, B=1000)
 par(mar=c(7,4,4,3),cex=1.0)
 plot(cal_1,lwd=2,lty=1,errbar.col=c(rgb(0,118,192,maxColorValue = 255)),
      xlab ="1-years Predicted Survival(Training)",subtitles=FALSE,pch=16,
@@ -273,10 +282,10 @@ abline(0,1,lty=3,lwd=2,col=c(rgb(0,0,0,maxColorValue= 255)))
 
 
 # 3年的曲线
-# coxm_3 <- cph(Surv(os_time,censor==0)~ imaging_score+stage+volume+sex,x=T,y=T,data=new_train,surv=T, time.inc = 36)
-# cox.zph(coxm_3)#等比例风险假定
-# print(coxm_3)
-# cal_3<-calibrate(coxm_3, u=36, method = "boot",cmethod = 'KM',m=75, B=1000)
+coxm_3 <- cph(Surv(os_time,censor==0)~ imaging_score+stage+volume+sex,x=T,y=T,data=new_train,surv=T, time.inc = 36)
+cox.zph(coxm_3)#等比例风险假定
+print(coxm_3)
+cal_3<-calibrate(coxm_3, u=36, method = "boot",cmethod = 'KM',m=75, B=1000)
 par(mar=c(7,4,4,3),cex=1.0)
 plot(cal_3,lwd=2,lty=1,errbar.col=c(rgb(0,118,192,maxColorValue = 255)),
      xlab ="3-years Predicted Survival(Training)",subtitles=FALSE,pch=16,
@@ -292,10 +301,10 @@ abline(0,1,lty=3,lwd=2,col=c(rgb(0,0,0,maxColorValue= 255)))
 
 
 # 5年的曲线
-# coxm_5 <- cph(Surv(os_time,censor==0)~ imaging_score+stage+volume+sex,x=T,y=T,data=new_train,surv=T, time.inc = 60)
-# cox.zph(coxm_5)#等比例风险假定
-# print(coxm_5)
-# cal_5<-calibrate(coxm_5, u=60, method = "boot",cmethod = 'KM',m=75, B=1000)
+coxm_5 <- cph(Surv(os_time,censor==0)~ imaging_score+stage+volume+sex,x=T,y=T,data=new_train,surv=T, time.inc = 60)
+cox.zph(coxm_5)#等比例风险假定
+print(coxm_5)
+cal_5<-calibrate(coxm_5, u=60, method = "boot",cmethod = 'KM',m=75, B=1000)
 par(mar=c(7,4,4,3),cex=1.0)
 plot(cal_5,lwd=2,lty=1,errbar.col=c(rgb(0,118,192,maxColorValue = 255)),
      xlab ="5-years Predicted Survival(Training)",subtitles=FALSE,pch=16,
@@ -308,11 +317,6 @@ abline(0,1,lty=3,lwd=2,col=c(rgb(0,0,0,maxColorValue= 255)))
 #      xlim = c(0,1),ylim = c(0,1),xlab ="5-years Predicted Survival(Testing)",subtitles=FALSE,pch=16,
 #      ylab="Actual Survival",col=c(rgb(255,0,0,maxColorValue =255)))
 # abline(0,1,lty=3,lwd=2,col=c(rgb(0,0,0,maxColorValue= 255)))
-
-
-
-
-
 
 
 
@@ -428,7 +432,7 @@ AUDC(val.dca_5)
 
 整体的 KM 生存率曲线
 ```{r}
-pred_f_training<-predict(coxm_5,new_train,type="lp")#!!!type="lp",是他没错
+pred_f_training<-predict(coxm_3,new_train,type="lp")#!!!type="lp",是他没错
 print(pred_f_training)
 data_table.train<-data.frame(time=new_train[,"os_time"],status=new_train[,"censor"],score=pred_f_training)
 
@@ -436,7 +440,7 @@ new_train$prognsis <- ifelse(pred_f_training>0,"poor", "good")
 fit.surv <- survfit(Surv(os_time,censor==0)~prognsis, data=new_train)
 ggsurvplot(fit.surv, conf.int=TRUE)
 
-pred_f_validation<-predict(coxm_5,new_val,type="lp")#!!!type="lp",是他没错
+pred_f_validation<-predict(coxm_3,new_val,type="lp")#!!!type="lp",是他没错
 print(pred_f_validation)
 data_table.val<-data.frame(time=new_val[,"os_time"],status=new_val[,"censor"],score=pred_f_validation)
 
@@ -444,6 +448,18 @@ new_val$prognsis <- ifelse(pred_f_validation>0,"poor", "good")
 fit.surv.val <- survfit(Surv(os_time,censor==0)~prognsis, data=new_val)
 ggsurvplot(fit.surv.val, conf.int=TRUE)
 
+
+# 写出数据
+write.csv(x = new_train,file = "train_dataset.csv")
+write.csv(x = new_val,file = "val_dataset.csv")
+
+radiomic_train <- cbind(radiomic_train, new_train$prognsis)
+colnames(radiomic_train)[18] <- 'prognsis'
+radiomic_val <- cbind(radiomic_val, new_val$prognsis)
+colnames(radiomic_val)[18] <- 'prognsis'
+
+write.csv(x = radiomic_train,file = "radiomic_train_dataset.csv")
+write.csv(x = radiomic_val,file = "radiomic_val_dataset.csv")
 
 
 ```

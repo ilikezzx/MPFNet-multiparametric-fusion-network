@@ -33,8 +33,8 @@ def reconstruct_mask(roi_path, is_T1=True):
     u = np.unique(mask)
     print(u)
     if is_T1:
-        # mask[mask != 0] = 1  # 坏死区域可看做肿瘤区域
-        mask[mask > 1] = 0
+        mask[mask != 0] = 1  # 坏死区域可看做肿瘤区域
+        # mask[mask > 1] = 0
     else:
         mask[mask > 1] = 0  # 水肿区域不可看做肿瘤区域
 
@@ -98,7 +98,7 @@ def obtain_features(dataset_path, patients_clinical, store_excel_path=r'./featur
             for series in os.listdir(path2):
                 series_path = os.path.join(path2, series)
                 imgs = glob.glob(series_path + "/**.nrrd")
-                rois = glob.glob(series_path + "/**_new.nii.gz")
+                rois = glob.glob(series_path + "/**.nii.gz")
                 is_T1 = False
                 if 't1' in series.lower():
                     is_T1 = True

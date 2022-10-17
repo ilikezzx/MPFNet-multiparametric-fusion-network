@@ -25,11 +25,12 @@ def curve(ori_image, mask, is_T1=True):
         color = [None, (0, 0, 255), (0, 200, 210)]
     else:
         color = [None, (0, 0, 255), (220, 150, 1)]
-    image = ori_image.copy()
-    if len(image.shape) == 2:
-        image = np.stack([image, image, image], axis=2)
-
-    color_curve = np.zeros_like(image)
+    # image = ori_image.copy()
+    # if len(image.shape) == 2:
+    #     image = np.stack([image, image, image], axis=2)
+    #
+    # color_curve = np.zeros_like(image)
+    color_curve = np.zeros((ori_image.shape[0], ori_image.shape[1], 3))
     for i in range(1, 3):
         color_curve[mask == i] = color[i]
     return color_curve

@@ -9,6 +9,7 @@
 # install.packages('VIM')
 # install.packages('pec')
 # install.packages('survminer')
+install.packages('ggprism')
 
 # devtools::install_github('yikeshu0611/ggDCA')
 
@@ -31,6 +32,7 @@ library(VIM) ## 包中aggr()函数，判断数据缺失情况
 library(pec)
 library(survival)
 library(survminer)
+library(ggprism)
 
 sigmoid = function(x) {
   1 / (1 + exp(-x))

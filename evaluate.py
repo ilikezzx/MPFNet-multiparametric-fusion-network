@@ -49,7 +49,7 @@ def evaluate(net, dataloader, device, logging, is_concat=False):
 
             batch_dsc_t1, batch_channel_dsc_t1 = multiclass_dice_coeff(mask_pred_oh_t1[:, 1:, ...],
                                                                        mask_true_oh_t1[:, 1:, ...],
-                                                                       reduce_batch_first=False, is_test=True)
+                                                                       reduce_batch_first=True, is_test=True)
 
             mask_pred_oh_t2 = F.one_hot(t2_pred.argmax(dim=1), net.n_classes[1]).permute(0, 3, 1, 2).float()
             mask_true_oh_t2 = F.one_hot(t2_tg, net.n_classes[1]).permute(0, 3, 1, 2).float()
@@ -57,7 +57,7 @@ def evaluate(net, dataloader, device, logging, is_concat=False):
 
             batch_dsc_t2, batch_channel_dsc_t2 = multiclass_dice_coeff(mask_pred_oh_t2[:, 1:, ...],
                                                                        mask_true_oh_t2[:, 1:, ...],
-                                                                       reduce_batch_first=False, is_test=True)
+                                                                       reduce_batch_first=True, is_test=True)
 
             dice_score += (batch_dsc_t1 + batch_dsc_t2) / 2
 
